@@ -1,0 +1,333 @@
+// Chatbot APP database schema
+// MVP P0 tables are required for阶段 1-3; P1/P2 tables are present so migrations don't churn later.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== Account / Profile =====
+
+model User {
+  id           String   @id @default(cuid())
+  email        String?  @unique
+  phone        String?  @unique
+  passwordHash String?
+  nickname     String
+  avatarUrl    String?
+  gender       Gender?
+  birthday     DateTime?
+  region       String?
+  bio          String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  devices                Device[]
+  friendsInitiated       Friendship[]          @relation("FriendshipUser")
+  friendsReceived        Friendship[]          @relation("FriendshipFriend")
+  conversationMembers    ConversationMember[]
+  messagesSent           Message[]             @relation("MessageSender")
+  ownedGroups            Group[]               @relation("GroupOwner")
+  groupMemberships       GroupMember[]
+  createdBots            Bot[]                 @relation("BotCreator")
+  botSubscriptions       BotSubscription[]
+  wallet                 Wallet?
+  transactions           Transaction[]
+  llmUsageLogs           LlmUsageLog[]
+
+  @@index([createdAt])
+}
+
+enum Gender {
+  male
+  female
+  other
+}
+
+model Device {
+  id          String   @id @default(cuid())
+  userId      String
+  platform    Platform
+  pushToken   String?
+  appVersion  String?
+  lastActive  DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, id])
+  @@index([userId])
+}
+
+enum Platform {
+  ios
+  android
+  web
+}
+
+// ===== Friendship =====
+
+model Friendship {
+  userId    String
+  friendId  String
+  status    FriendshipStatus @default(pending)
+  remark    String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user   User @relation("FriendshipUser", fields: [userId], references: [id], onDelete: Cascade)
+  friend User @relation("FriendshipFriend", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@id([userId, friendId])
+  @@index([friendId])
+}
+
+enum FriendshipStatus {
+  pending
+  accepted
+  blocked
+}
+
+// ===== Conversation / Message =====
+
+model Conversation {
+  id         String           @id @default(cuid())
+  type       ConversationType
+  // For direct: peerId is the other user. For group/bot: null, see Group/Bot via members.
+  peerId     String?
+  lastMsgId  String?
+  lastMsgAt  DateTime?
+  createdAt  DateTime         @default(now())
+
+  members  ConversationMember[]
+  messages Message[]
+
+  @@index([lastMsgAt])
+}
+
+enum ConversationType {
+  direct
+  group
+  bot
+}
+
+model ConversationMember {
+  conversationId String
+  userId         String
+  unreadCount    Int      @default(0)
+  muted          Boolean  @default(false)
+  joinedAt       DateTime @default(now())
+  lastReadMsgId  String?
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id             String      @id // Snowflake ID for ordering
+  conversationId String
+  senderId       String?     // null for system / bot messages
+  type           MessageType
+  content        Json        // {text} | {url, w, h} | {url, duration} ...
+  replyToId      String?
+  createdAt      DateTime    @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User?        @relation("MessageSender", fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+}
+
+enum MessageType {
+  text
+  image
+  voice
+  video
+  file
+  system
+}
+
+// ===== Group (P1) =====
+
+model Group {
+  id           String   @id @default(cuid())
+  ownerId      String
+  name         String
+  avatarUrl    String?
+  announcement String?
+  memberCount  Int      @default(1)
+  createdAt    DateTime @default(now())
+
+  owner   User          @relation("GroupOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members GroupMember[]
+}
+
+model GroupMember {
+  groupId  String
+  userId   String
+  role     GroupRole @default(member)
+  joinedAt DateTime  @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, userId])
+  @@index([userId])
+}
+
+enum GroupRole {
+  owner
+  admin
+  member
+}
+
+// ===== Bot =====
+
+model Bot {
+  id           String        @id @default(cuid())
+  creatorId    String
+  name         String
+  avatarUrl    String?
+  gender       Gender?
+  age          Int?
+  occupation   String?
+  bio          String?
+  systemPrompt String
+  model        String        @default("deepseek-chat")
+  temperature  Float         @default(0.7)
+  welcomeMsg   String?
+  isPublic     Boolean       @default(false)
+  priceType    BotPriceType  @default(free)
+  priceCents   Int           @default(0)
+  currency     String        @default("USD")
+  status       BotStatus     @default(draft)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  creator       User              @relation("BotCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  subscriptions BotSubscription[]
+  llmUsageLogs  LlmUsageLog[]
+
+  @@index([creatorId])
+  @@index([isPublic, status])
+}
+
+enum BotPriceType {
+  free
+  monthly
+  oneoff
+  per_msg
+}
+
+enum BotStatus {
+  draft
+  listed
+  banned
+}
+
+model BotSubscription {
+  id                  String                @id @default(cuid())
+  userId              String
+  botId               String
+  status              BotSubscriptionStatus @default(trial)
+  expiresAt           DateTime?
+  monthlyTokenQuota   Int                   @default(0)
+  usedTokens          Int                   @default(0)
+  subscribedAt        DateTime              @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bot  Bot  @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, botId])
+  @@index([botId])
+}
+
+enum BotSubscriptionStatus {
+  trial
+  active
+  expired
+}
+
+// ===== Wallet / Transaction (P1) =====
+
+model Wallet {
+  userId       String   @id
+  balanceCents Int      @default(0)
+  frozenCents  Int      @default(0)
+  currency     String   @default("USD")
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Transaction {
+  id              String            @id @default(cuid())
+  userId          String
+  type            TransactionType
+  amountCents     Int
+  currency        String            @default("USD")
+  relatedId       String?           // bot id or subscription id etc.
+  status          TransactionStatus @default(pending)
+  externalOrderId String?           // IAP / Play / Stripe / WeChat order id
+  createdAt       DateTime          @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([externalOrderId])
+}
+
+enum TransactionType {
+  recharge
+  consume
+  withdraw
+  income
+  refund
+}
+
+enum TransactionStatus {
+  pending
+  succeeded
+  failed
+  refunded
+}
+
+// ===== LLM Accounting =====
+
+model LlmUsageLog {
+  id           String   @id @default(cuid())
+  botId        String?
+  userId       String
+  model        String
+  inputTokens  Int
+  outputTokens Int
+  costCents    Int
+  createdAt    DateTime @default(now())
+
+  bot  Bot? @relation(fields: [botId], references: [id], onDelete: SetNull)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([botId, createdAt])
+}
+
+// ===== Moderation =====
+
+model ModerationLog {
+  id        String   @id @default(cuid())
+  contentId String
+  type      String   // text|image|voice|video
+  result    String   // pass|reject|review
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([contentId])
+  @@index([createdAt])
+}

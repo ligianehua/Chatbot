@@ -1,0 +1,71 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../features/auth/presentation/login_page.dart';
+import '../../features/bots/presentation/bots_page.dart';
+import '../../features/chat/presentation/chats_page.dart';
+import '../../features/contacts/presentation/contacts_page.dart';
+import '../../features/settings/presentation/settings_page.dart';
+
+final appRouterProvider = Provider<GoRouter>((ref) {
+  return GoRouter(
+    initialLocation: '/chats',
+    routes: [
+      GoRoute(path: '/login', builder: (_, __) => const LoginPage()),
+      ShellRoute(
+        builder: (context, state, child) => MainShell(child: child),
+        routes: [
+          GoRoute(path: '/chats', builder: (_, __) => const ChatsPage()),
+          GoRoute(path: '/contacts', builder: (_, __) => const ContactsPage()),
+          GoRoute(path: '/bots', builder: (_, __) => const BotsPage()),
+          GoRoute(path: '/settings', builder: (_, __) => const SettingsPage()),
+        ],
+      ),
+    ],
+  );
+});
+
+class MainShell extends StatelessWidget {
+  const MainShell({super.key, required this.child});
+
+  final Widget child;
+
+  static const _tabs = <_TabDef>[
+    _TabDef('/chats', Icons.chat_bubble_outline, '消息'),
+    _TabDef('/contacts', Icons.people_outline, '通讯录'),
+    _TabDef('/bots', Icons.smart_toy_outlined, 'Bot'),
+    _TabDef('/settings', Icons.settings_outlined, '我'),
+  ];
+
+  int _indexFor(String location) {
+    for (var i = 0; i < _tabs.length; i++) {
+      if (location.startsWith(_tabs[i].path)) return i;
+    }
+    return 0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final location = GoRouterState.of(context).uri.toString();
+    final index = _indexFor(location);
+
+    return Scaffold(
+      body: child,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: index,
+        onDestinationSelected: (i) => context.go(_tabs[i].path),
+        destinations: [
+          for (final t in _tabs) NavigationDestination(icon: Icon(t.icon), label: t.label),
+        ],
+      ),
+    );
+  }
+}
+
+class _TabDef {
+  const _TabDef(this.path, this.icon, this.label);
+  final String path;
+  final IconData icon;
+  final String label;
+}
