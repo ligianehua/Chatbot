@@ -141,14 +141,18 @@ class ChatRoomNotifier extends FamilyAsyncNotifier<ChatRoomState, String> {
         clientMsgId: clientMsgId,
       );
     } catch (e) {
+      // Mark the pending bubble as failed and re-throw so the page layer
+      // can show a contextual error (e.g. moderation rejection details).
       final cur = state.valueOrNull;
-      if (cur == null) return;
-      final updated = cur.messages
-          .map((m) => m.clientMsgId == clientMsgId
-              ? m.copyWith(status: MessageStatus.failed)
-              : m)
-          .toList();
-      state = AsyncValue.data(cur.copyWith(messages: updated, error: e));
+      if (cur != null) {
+        final updated = cur.messages
+            .map((m) => m.clientMsgId == clientMsgId
+                ? m.copyWith(status: MessageStatus.failed)
+                : m)
+            .toList();
+        state = AsyncValue.data(cur.copyWith(messages: updated, error: e));
+      }
+      rethrow;
     }
   }
 

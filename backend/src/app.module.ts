@@ -8,6 +8,7 @@ import { FriendsModule } from './friends/friends.module';
 import { GroupsModule } from './groups/groups.module';
 import { HealthController } from './health.controller';
 import { IapModule } from './iap/iap.module';
+import { ImageModerationModule } from './image-moderation/image-moderation.module';
 import { LegalController } from './legal.controller';
 import { LlmModule } from './llm/llm.module';
 import { MessagesModule } from './messages/messages.module';
@@ -27,6 +28,7 @@ import { WalletModule } from './wallet/wallet.module';
     LlmModule,
     WalletModule,
     PushModule,
+    ImageModerationModule,
     AuthModule,
     UsersModule,
     FriendsModule,

@@ -196,6 +196,30 @@ Android：
 - 通知 tap → 深链跳转还没接到 go_router（已留 `onMessageOpened` 钩子，下次提交可补）
 - 国内 Android 用户拿不到 FCM（防火墙）；上线时建议把 `firebase_messaging` 包在 `kIsWeb || Platform.isIOS` 检查里，国内 Android 走小米/华为推送（待办）
 
-## 后续阶段（见 plan）
+## 阶段 10 已交付（图片审核 UX）
 
-P1 待办：图片审核接阿里云内容安全 / OpenAI Moderation
+- `chat_provider.dart`：`sendImage` 失败时**重新抛出** DioException，UI 层能拿到详情
+- `chat_detail_page.dart`：捕获 400 → 读 `categories[]` → 提示「图片被内容策略拦截（porn, …），请换一张」；413 → 「图片太大（上限 10MB）」
+- 被拒图片的本地预览气泡保留并标红 ⚠ 图标，用户能看到自己刚才发的什么 + 为什么没成功
+
+## 后续阶段
+
+P1 主线交付完毕。剩余「上架前手续」清单（不涉及代码）：
+
+国内：
+- 生成式 AI 算法备案（网信办，2–4 个月）
+- ICP / 公安双备案
+- 网络文化经营许可证（建议办）
+- 实名认证集成
+
+海外：
+- App Store Connect 提交（已具备 Apple Sign-In / 账号删除 / 隐私协议 / IAP）
+- Play Console 提交（已具备 Google Sign-In / IAP / 通知）
+- TestFlight + Play 内测分发
+- 隐私清单 PrivacyInfo.xcprivacy
+
+未来代码增量（按必要性）：
+- drift 本地消息缓存（离线打开 App 也看历史）
+- 国内 Android 接小米 / 华为 / OPPO / vivo 推送通道
+- Apple / Google server notification webhook（自动反账）
+- 通知 tap → go_router 深链跳转

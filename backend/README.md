@@ -151,12 +151,53 @@ P1（进行中）：
 - [x] Bot 市场 + 订阅 + 钱包分账（16 项 e2e 通过）
 - [x] Apple Sign-In / Google Sign-In（10 项 e2e 通过）
 - [x] Apple IAP / Google Play Billing（12 项 e2e 通过）
-- [x] 推送通知（FCM v1，iOS 路由经 Firebase 自动转 APNs，8 项 e2e 通过，详见下面阶段 9）
-- [ ] 图片审核接阿里云内容安全 / OpenAI Moderation
+- [x] 推送通知（FCM v1，iOS 路由经 Firebase 自动转 APNs，8 项 e2e 通过）
+- [x] 图片审核（9 项 e2e 通过，OpenAI omni-moderation-latest 生产，mock 测试，详见下面阶段 10）
+
+P1 收尾：到这里 P1 主线已全部交付，**用户最初列的 6 个原始需求 + 阶段 4 上架准备 + P1 五项已全闭环**。剩下的是国内合规（生成式 AI 算法备案、文网文）+ 国内厂商推送通道，属于上架前手续工作而非代码工作。
 - [ ] 真实邮件服务接入替换 dev token 直返
 - [ ] FCM / APNs 推送实装
 - [ ] 图片内容审核（阿里云内容安全 / AWS Rekognition）
 - [ ] S3 预签名上传替代本地存储
+
+## 阶段 10 验收（图片内容审核）
+
+9 项 e2e 通过（`test/e2e-moderation.mjs`）：
+
+- [x] 干净文件名 → 接受，返回 `/uploads/...` URL
+- [x] `block-porn.png` → 400，body 含 `categories:['porn']`、`reason`
+- [x] `block-violence.png` → 400，category=`violence`
+- [x] 被拒绝的上传**不会落盘**（response 不带 url）
+- [x] 接受的上传仍可通过静态服务下载
+- [x] 大小写不敏感（`BLOCK-Porn.PNG` 也被拦）
+- [x] 拒绝原因 `mock filename trigger: ...` 入 body（可读+留痕）
+- [x] 无 token 上传 → 401
+
+### 设计要点
+
+- **同步前置审核**：UploadsController 收到 multipart → 先调 `ImageModerationService.check(buffer, mime, filename)` → allowed=false 直接 400 + 不写盘 + 写 `ModerationLog` 留痕（6 月保留期）
+- Provider 抽象（按 `IMAGE_MODERATION_MODE` 切换）：
+  - `mock`：开发/CI 用，按文件名 `block-<reason>` 触发拒绝
+  - `openai`：生产用，调 OpenAI `/v1/moderations` 的 `omni-moderation-latest` 模型（同时支持文本和图片输入）
+  - 阿里云内容安全：占位 TODO（国内方案，HMAC 签名+多分类）
+- **Fail-closed**：`NODE_ENV=production` 且 `IMAGE_MODERATION_MODE` 未配置时，**全部上传拒绝**（避免误配置静默放过违规内容）
+- Provider 抛错时：开发环境放行，生产环境 fail-closed
+- 所有审核结果都写 `ModerationLog`（type=image，result=pass|reject）
+
+### 生产配置
+
+```bash
+IMAGE_MODERATION_MODE=openai
+OPENAI_MODERATION_KEY=sk-...
+OPENAI_MODERATION_MODEL=omni-moderation-latest   # optional override
+```
+
+成本估算：OpenAI Moderation 现免费（含图片）；阿里云内容安全 ¥0.0025/张起。
+
+下一步（已留 TODO）：
+- 接阿里云内容安全（国内首选；提供更细的中文标签）
+- 文本输出审核也用 OpenAI Moderation 升级（目前是简易 DFA）
+- 视频 / 语音审核（语音可走 STT + 文本审）
 
 ## 阶段 9 验收（推送通知）
 

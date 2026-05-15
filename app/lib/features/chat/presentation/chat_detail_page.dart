@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -72,10 +73,35 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
       maxWidth: 2048,
     );
     if (picked == null) return;
-    await ref
-        .read(chatRoomProvider(widget.conversationId).notifier)
-        .sendImage(File(picked.path));
-    _scrollToBottom();
+    try {
+      await ref
+          .read(chatRoomProvider(widget.conversationId).notifier)
+          .sendImage(File(picked.path));
+      _scrollToBottom();
+    } on DioException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_friendlyUploadError(e))),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('发送失败：$e')));
+    }
+  }
+
+  String _friendlyUploadError(DioException e) {
+    final code = e.response?.statusCode;
+    final body = e.response?.data;
+    if (code == 400 && body is Map) {
+      final categories = body['categories'];
+      if (categories is List && categories.isNotEmpty) {
+        return '图片被内容策略拦截（${categories.join(', ')}），请换一张';
+      }
+      final msg = body['message'];
+      return msg is String ? '图片上传失败：$msg' : '图片上传失败';
+    }
+    if (code == 413) return '图片太大（上限 10MB）';
+    return '图片上传失败';
   }
 
   void _scrollToBottom() {
