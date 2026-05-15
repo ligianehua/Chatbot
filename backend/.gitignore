@@ -1,6 +1,8 @@
 node_modules/
 dist/
 coverage/
+# Runtime upload directory (only at the repo root of backend/, not src/uploads)
+/uploads/
 .env
 .env.local
 *.log

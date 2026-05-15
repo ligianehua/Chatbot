@@ -125,6 +125,31 @@ node test/e2e-chat.mjs     # 终端 B
 
 Bot 会话中用户发送依然走 `message:send`；服务端检测 `conversation.type === 'bot'` 后接入 LLM 网关。
 
-## 后续阶段（见 plan）
+## 阶段 4 验收
 
-阶段 4：上传 + 内容审核（接 阿里云 / OpenAI Moderation）+ 上架准备
+9 项发布准备 e2e 通过（`test/e2e-release.mjs`）：
+
+- [x] `GET /legal/privacy`、`GET /legal/terms` 公开可读
+- [x] 设备注册：`POST /users/me/devices` 入库（push token 占位）
+- [x] 图片上传：`POST /uploads/image` multipart，10MB 上限，仅接受 image/* mimetype
+- [x] 静态服务 `/uploads/*` 公开下载
+- [x] Socket.io 发送 `type:'image'` 消息，对端正确收到 url/mime/size
+- [x] 非 image mimetype 上传被 400 拒绝
+- [x] `DELETE /users/me` 注销账户（Apple 5.1.1 强制），级联清除
+- [x] 注销后旧 token 失效（401）、再次登录失败（401）
+
+跑测试：
+```bash
+node test/e2e-release.mjs
+```
+
+### 上架阶段路线图
+
+P0（已交付）：图片消息、账号删除入口、公开隐私/用户协议
+P1（待办）：
+- Apple Sign-In（验证 Apple ID token 的 JWKS 流程）
+- Google Sign-In
+- 真实邮件服务接入（SendGrid / 阿里云邮件）替换 dev token 直返
+- FCM/APNs 推送（占位 device 注册已就绪，下一步实现 PushService）
+- 图片内容审核（阿里云内容安全 / AWS Rekognition）
+- S3 预签名上传替代本地存储

@@ -13,6 +13,8 @@ import '../../features/chat/presentation/chats_page.dart';
 import '../../features/contacts/presentation/add_friend_page.dart';
 import '../../features/contacts/presentation/contacts_page.dart';
 import '../../features/contacts/presentation/friend_requests_page.dart';
+import '../../features/settings/presentation/delete_account_page.dart';
+import '../../features/settings/presentation/legal_page.dart';
 import '../../features/settings/presentation/settings_page.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -25,9 +27,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final loc = state.matchedLocation;
       const authPaths = {'/login', '/register', '/forgot-password'};
-      final atAuth = authPaths.contains(loc);
-      if (!isAuthed && !atAuth) return '/login';
-      if (isAuthed && atAuth) return '/chats';
+      // Legal pages must be reachable without login (App Store reviewer).
+      final isPublic = authPaths.contains(loc) || loc.startsWith('/legal/');
+      if (!isAuthed && !isPublic) return '/login';
+      if (isAuthed && authPaths.contains(loc)) return '/chats';
       return null;
     },
     routes: [
@@ -37,6 +40,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/contacts/add', builder: (_, __) => const AddFriendPage()),
       GoRoute(path: '/contacts/requests', builder: (_, __) => const FriendRequestsPage()),
       GoRoute(path: '/bots/new', builder: (_, __) => const BotEditPage()),
+      GoRoute(path: '/legal/privacy', builder: (_, __) => const LegalPage(kind: 'privacy')),
+      GoRoute(path: '/legal/terms', builder: (_, __) => const LegalPage(kind: 'terms')),
+      GoRoute(path: '/settings/delete-account', builder: (_, __) => const DeleteAccountPage()),
       GoRoute(
         path: '/chat/:id',
         builder: (_, state) => ChatDetailPage(

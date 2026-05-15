@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import '../../../core/socket/socket_client.dart';
 import '../../../core/storage/auth_storage.dart';
 import '../data/chat_api.dart';
 import '../data/chat_models.dart';
+import '../data/uploads_api.dart';
 
 class ChatRoomState {
   ChatRoomState({
@@ -112,6 +114,42 @@ class ChatRoomNotifier extends FamilyAsyncNotifier<ChatRoomState, String> {
     final s = state.valueOrNull ?? ChatRoomState();
     state = AsyncValue.data(s.copyWith(messages: [...s.messages, pending]));
     _socket.send(conversationId: arg, text: text, clientMsgId: clientMsgId);
+  }
+
+  Future<void> sendImage(File file) async {
+    final clientMsgId = _genClientId();
+    final pending = ChatMessage(
+      id: 'pending-$clientMsgId',
+      conversationId: arg,
+      senderId: _myUserId,
+      type: 'image',
+      content: {'localPath': file.path, 'mime': 'image/*', 'size': 0},
+      createdAt: DateTime.now(),
+      clientMsgId: clientMsgId,
+      status: MessageStatus.sending,
+    );
+    final s = state.valueOrNull ?? ChatRoomState();
+    state = AsyncValue.data(s.copyWith(messages: [...s.messages, pending]));
+
+    try {
+      final uploaded = await ref.read(uploadsApiProvider).uploadImage(file);
+      _socket.sendImage(
+        conversationId: arg,
+        url: uploaded.url,
+        mime: uploaded.mime,
+        size: uploaded.size,
+        clientMsgId: clientMsgId,
+      );
+    } catch (e) {
+      final cur = state.valueOrNull;
+      if (cur == null) return;
+      final updated = cur.messages
+          .map((m) => m.clientMsgId == clientMsgId
+              ? m.copyWith(status: MessageStatus.failed)
+              : m)
+          .toList();
+      state = AsyncValue.data(cur.copyWith(messages: updated, error: e));
+    }
   }
 
   void _onIncoming(Map<String, dynamic> payload) {

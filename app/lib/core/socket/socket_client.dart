@@ -79,9 +79,31 @@ class SocketClient {
   }) {
     _socket?.emit('message:send', {
       'conversationId': conversationId,
+      'type': 'text',
       'text': text,
       'clientMsgId': clientMsgId,
       if (replyToId != null) 'replyToId': replyToId,
+    });
+  }
+
+  void sendImage({
+    required String conversationId,
+    required String url,
+    required String mime,
+    required int size,
+    required String clientMsgId,
+    int? width,
+    int? height,
+  }) {
+    _socket?.emit('message:send', {
+      'conversationId': conversationId,
+      'type': 'image',
+      'url': url,
+      'mime': mime,
+      'size': size,
+      if (width != null) 'width': width,
+      if (height != null) 'height': height,
+      'clientMsgId': clientMsgId,
     });
   }
 

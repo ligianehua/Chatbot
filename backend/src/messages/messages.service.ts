@@ -12,6 +12,18 @@ export interface SendTextInput {
   replyToId?: string;
 }
 
+export interface SendImageInput {
+  conversationId: string;
+  senderId: string;
+  url: string;
+  mime: string;
+  size: number;
+  width?: number;
+  height?: number;
+  clientMsgId?: string;
+  replyToId?: string;
+}
+
 @Injectable()
 export class MessagesService {
   constructor(
@@ -26,6 +38,23 @@ export class MessagesService {
       senderId: input.senderId,
       type: MessageType.text,
       content: { text: input.text } as Prisma.InputJsonValue,
+      replyToId: input.replyToId,
+    });
+  }
+
+  async sendImage(input: SendImageInput) {
+    await this.conversations.ensureMember(input.conversationId, input.senderId);
+    return this.persist({
+      conversationId: input.conversationId,
+      senderId: input.senderId,
+      type: MessageType.image,
+      content: {
+        url: input.url,
+        mime: input.mime,
+        size: input.size,
+        ...(input.width != null ? { width: input.width } : {}),
+        ...(input.height != null ? { height: input.height } : {}),
+      } as Prisma.InputJsonValue,
       replyToId: input.replyToId,
     });
   }

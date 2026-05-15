@@ -27,12 +27,17 @@ class SettingsPage extends ConsumerWidget {
               ListTile(
                 leading: const Icon(Icons.notifications_outlined),
                 title: const Text('通知设置'),
-                onTap: () {/* TODO[阶段 2] */},
+                onTap: () {/* TODO[阶段 4 P1]: push opt-in toggles */},
               ),
               ListTile(
                 leading: const Icon(Icons.lock_outline),
-                title: const Text('隐私'),
-                onTap: () {/* TODO[阶段 4] */},
+                title: const Text('隐私政策'),
+                onTap: () => context.push('/legal/privacy'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.description_outlined),
+                title: const Text('用户协议'),
+                onTap: () => context.push('/legal/terms'),
               ),
               ListTile(
                 leading: const Icon(Icons.dark_mode_outlined),
@@ -40,6 +45,12 @@ class SettingsPage extends ConsumerWidget {
                 onTap: () {/* TODO */},
               ),
               const Divider(),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: const Text('注销账户', style: TextStyle(color: Colors.red)),
+                subtitle: const Text('永久删除账户和所有数据'),
+                onTap: () => context.push('/settings/delete-account'),
+              ),
               ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),
                 title: const Text('退出登录', style: TextStyle(color: Colors.red)),

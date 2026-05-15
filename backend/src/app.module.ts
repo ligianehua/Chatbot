@@ -6,9 +6,11 @@ import { ChatModule } from './chat/chat.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { FriendsModule } from './friends/friends.module';
 import { HealthController } from './health.controller';
+import { LegalController } from './legal.controller';
 import { LlmModule } from './llm/llm.module';
 import { MessagesModule } from './messages/messages.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { UploadsModule } from './uploads/uploads.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -26,7 +28,8 @@ import { UsersModule } from './users/users.module';
     MessagesModule,
     BotsModule,
     ChatModule,
+    UploadsModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, LegalController],
 })
 export class AppModule {}

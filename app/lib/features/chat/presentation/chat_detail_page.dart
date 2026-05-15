@@ -1,7 +1,12 @@
+import 'dart:io';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
+import '../../../core/config/api_config.dart';
 import '../data/chat_models.dart';
 import 'chat_provider.dart';
 
@@ -18,6 +23,7 @@ class ChatDetailPage extends ConsumerStatefulWidget {
 class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
   final _input = TextEditingController();
   final _scroll = ScrollController();
+  final _picker = ImagePicker();
   String? _myUserId;
 
   @override
@@ -47,6 +53,23 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     if (text.isEmpty) return;
     ref.read(chatRoomProvider(widget.conversationId).notifier).sendText(text);
     _input.clear();
+    _scrollToBottom();
+  }
+
+  Future<void> _pickAndSendImage() async {
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+      maxWidth: 2048,
+    );
+    if (picked == null) return;
+    await ref
+        .read(chatRoomProvider(widget.conversationId).notifier)
+        .sendImage(File(picked.path));
+    _scrollToBottom();
+  }
+
+  void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
         _scroll.animateTo(_scroll.position.maxScrollExtent,
@@ -98,6 +121,11 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
               child: Row(
                 children: [
+                  IconButton(
+                    icon: const Icon(Icons.image_outlined),
+                    tooltip: '发送图片',
+                    onPressed: _pickAndSendImage,
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _input,
@@ -126,7 +154,6 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
   }
 
   bool _isMe(ChatMessage m) {
-    // Bot messages have senderId == null and align left.
     if (m.senderId == null) return false;
     _myUserId ??= ref.read(chatRoomProvider(widget.conversationId).notifier).myUserId;
     return _myUserId != null && m.senderId == _myUserId;
@@ -152,12 +179,14 @@ class _MessageBubble extends StatelessWidget {
         children: [
           Flexible(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: message.type == 'image'
+                  ? const EdgeInsets.all(4)
+                  : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: bg,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Text(message.text, style: TextStyle(color: fg)),
+              child: _body(fg),
             ),
           ),
           if (isMe && message.status == MessageStatus.sending)
@@ -173,5 +202,44 @@ class _MessageBubble extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _body(Color fg) {
+    if (message.type == 'image') {
+      final localPath = message.content['localPath'];
+      if (localPath is String && localPath.isNotEmpty) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.file(File(localPath), width: 220, fit: BoxFit.cover),
+        );
+      }
+      final relUrl = message.content['url'] as String?;
+      if (relUrl == null) return Text('[图片缺失]', style: TextStyle(color: fg));
+      final abs = _absolute(relUrl);
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: CachedNetworkImage(
+          imageUrl: abs,
+          width: 220,
+          fit: BoxFit.cover,
+          placeholder: (_, __) => const SizedBox(
+            width: 220, height: 220, child: Center(child: CircularProgressIndicator()),
+          ),
+          errorWidget: (_, __, ___) => SizedBox(
+            width: 220, height: 100,
+            child: Center(child: Text('图片加载失败', style: TextStyle(color: fg))),
+          ),
+        ),
+      );
+    }
+    return Text(message.text, style: TextStyle(color: fg));
+  }
+
+  String _absolute(String url) {
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    final base = ApiConfig.baseUrl;
+    final originEnd = base.indexOf('/api/');
+    final origin = originEnd > 0 ? base.substring(0, originEnd) : base;
+    return '$origin$url';
   }
 }

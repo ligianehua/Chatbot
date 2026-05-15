@@ -103,29 +103,46 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody(new ValidationPipe({ whitelist: true, transform: true })) dto: SendMessageDto,
   ) {
     const userId = client.data.userId;
+    const type = dto.type ?? 'text';
     try {
-      // Content moderation gate — pre-LLM, pre-broadcast.
-      const allowed = await this.moderation.check({
-        contentId: dto.clientMsgId ?? 'unknown',
-        type: 'text',
-        text: dto.text,
-      });
-      if (!allowed) {
-        client.emit('message:error', {
-          clientMsgId: dto.clientMsgId,
-          reason: 'content moderation rejected',
+      // Content moderation only screens text messages for now.
+      // Image moderation (阿里云内容安全) is planned for阶段 4 P1.
+      if (type === 'text') {
+        const allowed = await this.moderation.check({
+          contentId: dto.clientMsgId ?? 'unknown',
+          type: 'text',
+          text: dto.text ?? '',
         });
-        return { ok: false, reason: 'moderation' };
+        if (!allowed) {
+          client.emit('message:error', {
+            clientMsgId: dto.clientMsgId,
+            reason: 'content moderation rejected',
+          });
+          return { ok: false, reason: 'moderation' };
+        }
       }
 
       const conv = await this.conversations.findById(dto.conversationId);
-      const message = await this.messages.sendText({
-        conversationId: dto.conversationId,
-        senderId: userId,
-        text: dto.text,
-        clientMsgId: dto.clientMsgId,
-        replyToId: dto.replyToId,
-      });
+      const message =
+        type === 'image'
+          ? await this.messages.sendImage({
+              conversationId: dto.conversationId,
+              senderId: userId,
+              url: dto.url!,
+              mime: dto.mime!,
+              size: dto.size!,
+              width: dto.width,
+              height: dto.height,
+              clientMsgId: dto.clientMsgId,
+              replyToId: dto.replyToId,
+            })
+          : await this.messages.sendText({
+              conversationId: dto.conversationId,
+              senderId: userId,
+              text: dto.text!,
+              clientMsgId: dto.clientMsgId,
+              replyToId: dto.replyToId,
+            });
 
       client.emit('message:ack', {
         clientMsgId: dto.clientMsgId,
@@ -146,10 +163,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return { ok: true };
       }
 
-      // Bot conversation: stream the LLM reply back to the sender.
-      this.runBotReply(client, dto.conversationId, userId).catch((e) => {
-        this.logger.error(`bot reply failed: ${e instanceof Error ? e.message : e}`);
-      });
+      // Bot conversation: stream the LLM reply for text only. Image / other
+      // media gets persisted but does not trigger an LLM call in MVP.
+      if (type === 'text') {
+        this.runBotReply(client, dto.conversationId, userId).catch((e) => {
+          this.logger.error(`bot reply failed: ${e instanceof Error ? e.message : e}`);
+        });
+      }
       return { ok: true };
     } catch (e) {
       const reason = e instanceof Error ? e.message : 'unknown';

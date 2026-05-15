@@ -1,10 +1,40 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Platform } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { RegisterDeviceDto } from './dto/register-device.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Apple App Review (Guideline 5.1.1(v)) requires an in-app account
+   * deletion flow. Cascades through related rows via Prisma onDelete: Cascade.
+   */
+  async deleteAccount(userId: string): Promise<void> {
+    await this.prisma.user.delete({ where: { id: userId } });
+  }
+
+  async registerDevice(userId: string, dto: RegisterDeviceDto) {
+    const platform: Platform = dto.platform;
+    return this.prisma.device.upsert({
+      where: { userId_id: { userId, id: dto.deviceId } },
+      update: {
+        platform,
+        pushToken: dto.pushToken,
+        appVersion: dto.appVersion,
+        lastActive: new Date(),
+      },
+      create: {
+        id: dto.deviceId,
+        userId,
+        platform,
+        pushToken: dto.pushToken,
+        appVersion: dto.appVersion,
+      },
+    });
+  }
 
   async getMe(userId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });

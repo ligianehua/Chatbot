@@ -85,6 +85,16 @@ flutter run
 - 复用 `chat_detail_page.dart` 与 Bot 聊天，区别仅在 `senderId == null` 时左对齐
 - 流式渲染：`bot:start` 插入流式占位气泡，`bot:chunk` 逐 token 追加，`bot:done` 替换为落库消息
 
+## 阶段 4 已交付
+
+- `image_picker` + `url_launcher` 依赖
+- `features/chat/data/uploads_api.dart`：multipart 图片上传，自动把服务端返回的相对 URL 解析为绝对地址
+- `chat_detail_page.dart`：左下图片按钮，pick → upload → 通过 socket 发送 `type:image`，本地预览先用 `Image.file`，服务端 url 返回后切换 `CachedNetworkImage`
+- 会话列表 preview 显示 `[图片]`/`[语音]` 等
+- `features/settings/data/legal_api.dart` + `legal_page.dart`：从后端拉取隐私/用户协议
+- `delete_account_page.dart`：复选框 + 二次确认弹窗 + 调 `DELETE /users/me` + 自动登出
+- 路由：登录页底部公开链接到 `/legal/*`（App Store 审核需要不登录就能访问）
+
 ## 后续阶段（见 plan）
 
-阶段 4：图片消息 + 上架准备
+P1：群聊、Bot 市场、月订阅付费、Apple/Google Sign-In、真实推送

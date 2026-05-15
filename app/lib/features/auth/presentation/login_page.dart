@@ -88,6 +88,21 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   onPressed: () => context.push('/forgot-password'),
                   child: const Text('忘记密码？'),
                 ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    TextButton(
+                      onPressed: () => context.push('/legal/privacy'),
+                      child: const Text('隐私政策', style: TextStyle(fontSize: 12)),
+                    ),
+                    const Text('·', style: TextStyle(color: Colors.grey)),
+                    TextButton(
+                      onPressed: () => context.push('/legal/terms'),
+                      child: const Text('用户协议', style: TextStyle(fontSize: 12)),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),

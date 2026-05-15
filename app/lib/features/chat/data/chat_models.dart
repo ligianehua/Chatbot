@@ -57,6 +57,10 @@ class ConversationSummary {
       final text = m.content['text'];
       return text is String ? text : '';
     }
+    if (m.type == 'image') return '[图片]';
+    if (m.type == 'voice') return '[语音]';
+    if (m.type == 'video') return '[视频]';
+    if (m.type == 'file') return '[文件]';
     return '[${m.type}]';
   }
 }
