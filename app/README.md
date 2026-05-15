@@ -65,8 +65,19 @@ flutter run
 - iOS 模拟器：`flutter run --dart-define=API_BASE_URL=http://localhost:3000/api/v1`
 - 真机调试：`flutter run --dart-define=API_BASE_URL=http://<电脑局域网IP>:3000/api/v1`
 
+## 阶段 2 已交付
+
+- `core/socket/socket_client.dart`：Socket.io 客户端封装（自动重连、token 鉴权、事件流暴露）
+- `features/chat/data/`：会话/消息 REST API + 模型
+- `features/chat/presentation/chats_page.dart`：会话列表（含未读角标、新消息自动刷新）
+- `features/chat/presentation/chat_provider.dart`：单会话状态（FamilyAsyncNotifier，加载历史 + socket 实时）
+- `features/chat/presentation/chat_detail_page.dart`：聊天页（消息气泡 + 输入框 + 上拉加载历史）
+- 通讯录里点好友自动开/复用 direct 会话并跳到聊天页
+- 路由：`/chat/:id?title=…`
+
+注意：MVP 阶段消息只在内存缓存，重启后通过 REST 重新加载历史。drift 本地持久化下个迭代再做。
+
 ## 后续阶段（见 plan）
 
-阶段 2：1 对 1 文字聊天 + 离线消息 + 推送
 阶段 3：Bot 创建表单 + 与 Bot 聊天（流式）
 阶段 4：图片消息 + 上架准备

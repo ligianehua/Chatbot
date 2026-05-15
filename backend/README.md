@@ -67,8 +67,40 @@ npm run start:dev              # 终端 A
 ./test/e2e-flow.sh             # 终端 B
 ```
 
+## 阶段 2 验收
+
+12 项 WebSocket + REST 端到端检查通过（`test/e2e-chat.mjs`）：
+
+- [x] 注册两个用户 + 互加好友 + 创建 direct 会话
+- [x] 双端用 access token 连 Socket.io；非法 token 被拒
+- [x] 单条消息 send → ack（带 client/server msg id）→ 对端 message:new
+- [x] 50 条突发消息：全部送达、ID 唯一、按 snowflake 单调（客户端按 ID 排序）
+- [x] 离线 5 条消息 → 重连后 `message:sync` 拉回准确数量
+- [x] REST `/conversations` 含未读计数、`/conversations/:id/read` 清零
+- [x] REST `/conversations/:id/messages` 分页（before cursor）
+
+跑测试：
+```bash
+npm run start:dev          # 终端 A
+node test/e2e-chat.mjs     # 终端 B
+```
+
+### Socket.io 协议
+
+连接：`io(WS_URL, { auth: { token: <access> } })`
+
+事件：
+- `connect:ready` — 服务端鉴权成功
+- `connect:error` — token 缺失/失效
+- `message:send` (C→S) `{conversationId, text, clientMsgId, replyToId?}`
+- `message:ack` (S→C) `{clientMsgId, message}` — 给发送者
+- `message:new` (S→C) `{message}` — 给会话其他成员
+- `message:sync` (C→S, ack) `{sinceMsgId?}` → `{messages: [...]}` — 离线/重连恢复
+- `message:error` (S→C) `{clientMsgId, reason}`
+
+注意：客户端必须按 `message.id` 排序而非到达顺序——并发处理下到达顺序不保证。
+
 ## 后续阶段（见 plan）
 
-阶段 2：chat-gateway (Socket.io) + conversations + messages
 阶段 3：bots + llm 网关
 阶段 4：上传 + 内容审核 + 上架准备

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../chat/data/chat_api.dart';
 import '../data/friends_api.dart';
 
 class ContactsPage extends ConsumerWidget {
@@ -64,8 +65,18 @@ class ContactsPage extends ConsumerWidget {
                     ),
                     title: Text(f.remark?.isNotEmpty == true ? f.remark! : f.nickname),
                     subtitle: f.bio == null ? null : Text(f.bio!),
-                    onTap: () {
-                      // TODO[阶段 2]: open chat with this friend.
+                    onTap: () async {
+                      try {
+                        final conv = await ref.read(chatApiProvider).openDirect(f.id);
+                        final convId = conv['id'] as String;
+                        if (!context.mounted) return;
+                        context.push('/chat/$convId?title=${Uri.encodeComponent(f.nickname)}');
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('打开会话失败：$e')),
+                        );
+                      }
                     },
                   )).toList(),
                 );

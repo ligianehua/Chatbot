@@ -7,6 +7,7 @@ import '../../features/auth/presentation/forgot_password_page.dart';
 import '../../features/auth/presentation/login_page.dart';
 import '../../features/auth/presentation/register_page.dart';
 import '../../features/bots/presentation/bots_page.dart';
+import '../../features/chat/presentation/chat_detail_page.dart';
 import '../../features/chat/presentation/chats_page.dart';
 import '../../features/contacts/presentation/add_friend_page.dart';
 import '../../features/contacts/presentation/contacts_page.dart';
@@ -34,6 +35,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/forgot-password', builder: (_, __) => const ForgotPasswordPage()),
       GoRoute(path: '/contacts/add', builder: (_, __) => const AddFriendPage()),
       GoRoute(path: '/contacts/requests', builder: (_, __) => const FriendRequestsPage()),
+      GoRoute(
+        path: '/chat/:id',
+        builder: (_, state) => ChatDetailPage(
+          conversationId: state.pathParameters['id']!,
+          title: state.uri.queryParameters['title'],
+        ),
+      ),
       ShellRoute(
         builder: (context, state, child) => MainShell(child: child),
         routes: [
