@@ -77,7 +77,14 @@ flutter run
 
 注意：MVP 阶段消息只在内存缓存，重启后通过 REST 重新加载历史。drift 本地持久化下个迭代再做。
 
+## 阶段 3 已交付
+
+- `features/bots/data/`：Bot 模型 + API（CRUD + open conversation）
+- `features/bots/presentation/bots_page.dart`：我的 Bot 列表（点击即开聊天）
+- `features/bots/presentation/bot_edit_page.dart`：创建表单（姓名/性别/年龄/职位/简介/system prompt/温度滑块/开场白）
+- 复用 `chat_detail_page.dart` 与 Bot 聊天，区别仅在 `senderId == null` 时左对齐
+- 流式渲染：`bot:start` 插入流式占位气泡，`bot:chunk` 逐 token 追加，`bot:done` 替换为落库消息
+
 ## 后续阶段（见 plan）
 
-阶段 3：Bot 创建表单 + 与 Bot 聊天（流式）
 阶段 4：图片消息 + 上架准备

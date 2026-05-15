@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
+import { BotsModule } from './bots/bots.module';
 import { ChatModule } from './chat/chat.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { FriendsModule } from './friends/friends.module';
 import { HealthController } from './health.controller';
+import { LlmModule } from './llm/llm.module';
 import { MessagesModule } from './messages/messages.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
@@ -16,11 +18,13 @@ import { UsersModule } from './users/users.module';
       envFilePath: ['.env.local', '.env'],
     }),
     PrismaModule,
+    LlmModule,
     AuthModule,
     UsersModule,
     FriendsModule,
     ConversationsModule,
     MessagesModule,
+    BotsModule,
     ChatModule,
   ],
   controllers: [HealthController],

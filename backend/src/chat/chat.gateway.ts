@@ -10,10 +10,16 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
+import { ConversationType, MessageType, Prisma } from '@prisma/client';
 import { Server, Socket } from 'socket.io';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
+import { BotsService } from '../bots/bots.service';
+import { Snowflake } from '../common/snowflake';
 import { ConversationsService } from '../conversations/conversations.service';
+import { LlmService } from '../llm/llm.service';
+import { ModerationService } from '../llm/moderation.service';
 import { MessagesService } from '../messages/messages.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { SyncDto } from './dto/sync.dto';
 
@@ -42,6 +48,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly config: ConfigService,
     private readonly messages: MessagesService,
     private readonly conversations: ConversationsService,
+    private readonly bots: BotsService,
+    private readonly llm: LlmService,
+    private readonly moderation: ModerationService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -94,6 +104,21 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     const userId = client.data.userId;
     try {
+      // Content moderation gate — pre-LLM, pre-broadcast.
+      const allowed = await this.moderation.check({
+        contentId: dto.clientMsgId ?? 'unknown',
+        type: 'text',
+        text: dto.text,
+      });
+      if (!allowed) {
+        client.emit('message:error', {
+          clientMsgId: dto.clientMsgId,
+          reason: 'content moderation rejected',
+        });
+        return { ok: false, reason: 'moderation' };
+      }
+
+      const conv = await this.conversations.findById(dto.conversationId);
       const message = await this.messages.sendText({
         conversationId: dto.conversationId,
         senderId: userId,
@@ -102,29 +127,96 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         replyToId: dto.replyToId,
       });
 
-      // Ack to sender (with both client and server ids).
       client.emit('message:ack', {
         clientMsgId: dto.clientMsgId,
         message,
       });
 
-      // Broadcast to all other connected members.
-      const memberIds = await this.conversations.getMembers(dto.conversationId);
-      for (const memberId of memberIds) {
-        const sockets = this.userSockets.get(memberId);
-        if (!sockets) continue;
-        for (const sid of sockets) {
-          if (sid === client.id) continue;
-          this.server.to(sid).emit('message:new', { message });
+      // Direct/group: fan out to other connected members.
+      if (conv.type !== ConversationType.bot) {
+        const memberIds = await this.conversations.getMembers(dto.conversationId);
+        for (const memberId of memberIds) {
+          const sockets = this.userSockets.get(memberId);
+          if (!sockets) continue;
+          for (const sid of sockets) {
+            if (sid === client.id) continue;
+            this.server.to(sid).emit('message:new', { message });
+          }
         }
+        return { ok: true };
       }
 
+      // Bot conversation: stream the LLM reply back to the sender.
+      this.runBotReply(client, dto.conversationId, userId).catch((e) => {
+        this.logger.error(`bot reply failed: ${e instanceof Error ? e.message : e}`);
+      });
       return { ok: true };
     } catch (e) {
       const reason = e instanceof Error ? e.message : 'unknown';
       client.emit('message:error', { clientMsgId: dto.clientMsgId, reason });
       return { ok: false, reason };
     }
+  }
+
+  private async runBotReply(client: AuthedSocket, conversationId: string, userId: string) {
+    const bot = await this.bots.resolveBotForConversation(conversationId, userId);
+    const replyClientMsgId = `bot-${Snowflake.generate()}`;
+
+    client.emit('bot:start', { conversationId, clientMsgId: replyClientMsgId, botId: bot.id });
+
+    let fullText = '';
+    const result = await this.llm.streamForBot({
+      botId: bot.id,
+      userId,
+      conversationId,
+      onChunk: (delta) => {
+        fullText += delta;
+        client.emit('bot:chunk', {
+          conversationId,
+          clientMsgId: replyClientMsgId,
+          delta,
+        });
+      },
+    });
+
+    // Output-side moderation. On reject, replace with a neutral notice.
+    let outText = result.fullText || fullText;
+    const outOk = await this.moderation.check({
+      contentId: replyClientMsgId,
+      type: 'text',
+      text: outText,
+    });
+    if (!outOk) outText = '[内容被安全策略屏蔽]';
+
+    const id = Snowflake.generate();
+    const now = new Date();
+    const persisted = await this.prisma.$transaction(async (tx) => {
+      const m = await tx.message.create({
+        data: {
+          id,
+          conversationId,
+          senderId: null, // bot
+          type: MessageType.text,
+          content: { text: outText, botId: bot.id, model: result.model } as Prisma.InputJsonValue,
+          createdAt: now,
+        },
+      });
+      await tx.conversation.update({
+        where: { id: conversationId },
+        data: { lastMsgId: id, lastMsgAt: now },
+      });
+      await tx.conversationMember.update({
+        where: { conversationId_userId: { conversationId, userId } },
+        data: { unreadCount: { increment: 1 } },
+      });
+      return m;
+    });
+
+    client.emit('bot:done', {
+      conversationId,
+      clientMsgId: replyClientMsgId,
+      message: persisted,
+    });
   }
 
   @SubscribeMessage('message:sync')

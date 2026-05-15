@@ -100,7 +100,31 @@ node test/e2e-chat.mjs     # 终端 B
 
 注意：客户端必须按 `message.id` 排序而非到达顺序——并发处理下到达顺序不保证。
 
+## 阶段 3 验收
+
+10 项 LLM + Bot 端到端检查通过（`test/e2e-bot.mjs`）：
+
+- [x] Bot CRUD（创建/查/改/删，owner 鉴权）
+- [x] 打开 bot 会话幂等；首次自动种入开场白
+- [x] WebSocket 流式回复：`bot:start` → 多个 `bot:chunk` → `bot:done`
+- [x] chunks 拼接 == 最终落库消息文本
+- [x] 内容审核：用户侧违禁词被拦截，输出侧也复审
+- [x] 非创建者无法访问私有 Bot（403）
+- [x] 删除 Bot 后 GET 404
+
+环境变量：
+- `LLM_API_KEY` 未配置时自动用 MockProvider（用于测试和无网开发）
+- 配 DeepSeek：`LLM_API_KEY=sk-xxx`、`LLM_BASE_URL=https://api.deepseek.com`（默认）
+- OpenAI 兼容服务可直接换 base URL
+
+### Socket.io 协议（扩展）
+
+- `bot:start` (S→C) `{conversationId, clientMsgId, botId}` — 开始流式
+- `bot:chunk` (S→C) `{conversationId, clientMsgId, delta}` — 逐 token 推送
+- `bot:done`  (S→C) `{conversationId, clientMsgId, message}` — 完成并落库
+
+Bot 会话中用户发送依然走 `message:send`；服务端检测 `conversation.type === 'bot'` 后接入 LLM 网关。
+
 ## 后续阶段（见 plan）
 
-阶段 3：bots + llm 网关
-阶段 4：上传 + 内容审核 + 上架准备
+阶段 4：上传 + 内容审核（接 阿里云 / OpenAI Moderation）+ 上架准备

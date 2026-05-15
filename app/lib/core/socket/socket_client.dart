@@ -19,11 +19,17 @@ class SocketClient {
   final _ackController = StreamController<Map<String, dynamic>>.broadcast();
   final _errorController = StreamController<Map<String, dynamic>>.broadcast();
   final _connectionController = StreamController<bool>.broadcast();
+  final _botStartController = StreamController<Map<String, dynamic>>.broadcast();
+  final _botChunkController = StreamController<Map<String, dynamic>>.broadcast();
+  final _botDoneController = StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<Map<String, dynamic>> get newMessages => _newMessageController.stream;
   Stream<Map<String, dynamic>> get acks => _ackController.stream;
   Stream<Map<String, dynamic>> get errors => _errorController.stream;
   Stream<bool> get connectionState => _connectionController.stream;
+  Stream<Map<String, dynamic>> get botStart => _botStartController.stream;
+  Stream<Map<String, dynamic>> get botChunk => _botChunkController.stream;
+  Stream<Map<String, dynamic>> get botDone => _botDoneController.stream;
 
   bool get isConnected => _socket?.connected ?? false;
 
@@ -51,7 +57,10 @@ class SocketClient {
       ..on('connect:error', (data) => _errorController.add(_asMap(data)))
       ..on('message:new', (data) => _newMessageController.add(_asMap(data)))
       ..on('message:ack', (data) => _ackController.add(_asMap(data)))
-      ..on('message:error', (data) => _errorController.add(_asMap(data)));
+      ..on('message:error', (data) => _errorController.add(_asMap(data)))
+      ..on('bot:start', (data) => _botStartController.add(_asMap(data)))
+      ..on('bot:chunk', (data) => _botChunkController.add(_asMap(data)))
+      ..on('bot:done', (data) => _botDoneController.add(_asMap(data)));
 
     _socket!.connect();
   }
@@ -109,6 +118,9 @@ class SocketClient {
     _ackController.close();
     _errorController.close();
     _connectionController.close();
+    _botStartController.close();
+    _botChunkController.close();
+    _botDoneController.close();
   }
 }
 

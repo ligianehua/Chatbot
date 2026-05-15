@@ -126,7 +126,8 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
   }
 
   bool _isMe(ChatMessage m) {
-    // Cache user id once; first time around it may be null and we fall back to alignment by sender presence.
+    // Bot messages have senderId == null and align left.
+    if (m.senderId == null) return false;
     _myUserId ??= ref.read(chatRoomProvider(widget.conversationId).notifier).myUserId;
     return _myUserId != null && m.senderId == _myUserId;
   }

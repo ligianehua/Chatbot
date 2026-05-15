@@ -46,7 +46,11 @@ class ChatRoomNotifier extends FamilyAsyncNotifier<ChatRoomState, String> {
 
   StreamSubscription<Map<String, dynamic>>? _newSub;
   StreamSubscription<Map<String, dynamic>>? _ackSub;
+  StreamSubscription<Map<String, dynamic>>? _botStartSub;
+  StreamSubscription<Map<String, dynamic>>? _botChunkSub;
+  StreamSubscription<Map<String, dynamic>>? _botDoneSub;
   String? _myUserId;
+  final Map<String, String> _botStreamingTextById = {}; // clientMsgId -> accumulated text
 
   String? get myUserId => _myUserId;
 
@@ -56,9 +60,15 @@ class ChatRoomNotifier extends FamilyAsyncNotifier<ChatRoomState, String> {
     await _socket.connect();
     _newSub = _socket.newMessages.listen(_onIncoming);
     _ackSub = _socket.acks.listen(_onAck);
+    _botStartSub = _socket.botStart.listen(_onBotStart);
+    _botChunkSub = _socket.botChunk.listen(_onBotChunk);
+    _botDoneSub = _socket.botDone.listen(_onBotDone);
     ref.onDispose(() {
       _newSub?.cancel();
       _ackSub?.cancel();
+      _botStartSub?.cancel();
+      _botChunkSub?.cancel();
+      _botDoneSub?.cancel();
     });
 
     final history = await _api.history(conversationId, limit: 50);
@@ -132,6 +142,71 @@ class ChatRoomNotifier extends FamilyAsyncNotifier<ChatRoomState, String> {
       return m;
     }).toList()
       ..sort((a, b) => a.id.compareTo(b.id));
+    state = AsyncValue.data(s.copyWith(messages: updated));
+  }
+
+  void _onBotStart(Map<String, dynamic> payload) {
+    if (payload['conversationId'] != arg) return;
+    final clientMsgId = payload['clientMsgId'] as String?;
+    if (clientMsgId == null) return;
+    _botStreamingTextById[clientMsgId] = '';
+    final placeholder = ChatMessage(
+      id: 'streaming-$clientMsgId',
+      conversationId: arg,
+      senderId: null, // bot
+      type: 'text',
+      content: const {'text': ''},
+      createdAt: DateTime.now(),
+      clientMsgId: clientMsgId,
+      status: MessageStatus.sending,
+    );
+    final s = state.valueOrNull ?? ChatRoomState();
+    state = AsyncValue.data(s.copyWith(messages: [...s.messages, placeholder]));
+  }
+
+  void _onBotChunk(Map<String, dynamic> payload) {
+    if (payload['conversationId'] != arg) return;
+    final clientMsgId = payload['clientMsgId'] as String?;
+    final delta = payload['delta'] as String?;
+    if (clientMsgId == null || delta == null) return;
+    final acc = (_botStreamingTextById[clientMsgId] ?? '') + delta;
+    _botStreamingTextById[clientMsgId] = acc;
+
+    final s = state.valueOrNull;
+    if (s == null) return;
+    final updated = s.messages.map((m) {
+      if (m.clientMsgId == clientMsgId && m.id.startsWith('streaming-')) {
+        return ChatMessage(
+          id: m.id,
+          conversationId: m.conversationId,
+          senderId: m.senderId,
+          type: m.type,
+          content: {'text': acc},
+          createdAt: m.createdAt,
+          clientMsgId: m.clientMsgId,
+          status: m.status,
+        );
+      }
+      return m;
+    }).toList();
+    state = AsyncValue.data(s.copyWith(messages: updated));
+  }
+
+  void _onBotDone(Map<String, dynamic> payload) {
+    if (payload['conversationId'] != arg) return;
+    final clientMsgId = payload['clientMsgId'] as String?;
+    final msgRaw = payload['message'];
+    if (clientMsgId == null || msgRaw is! Map) return;
+    _botStreamingTextById.remove(clientMsgId);
+    final final_ = ChatMessage.fromJson(msgRaw.cast<String, dynamic>());
+
+    final s = state.valueOrNull;
+    if (s == null) return;
+    final updated = s.messages
+        .where((m) => !(m.clientMsgId == clientMsgId && m.id.startsWith('streaming-')))
+        .toList();
+    if (!updated.any((m) => m.id == final_.id)) updated.add(final_);
+    updated.sort((a, b) => a.id.compareTo(b.id));
     state = AsyncValue.data(s.copyWith(messages: updated));
   }
 
