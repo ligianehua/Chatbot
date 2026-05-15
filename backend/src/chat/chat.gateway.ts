@@ -20,6 +20,7 @@ import { LlmService } from '../llm/llm.service';
 import { ModerationService } from '../llm/moderation.service';
 import { MessagesService } from '../messages/messages.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PushService } from '../push/push.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { SyncDto } from './dto/sync.dto';
 
@@ -52,6 +53,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly llm: LlmService,
     private readonly moderation: ModerationService,
     private readonly prisma: PrismaService,
+    private readonly push: PushService,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -149,15 +151,29 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         message,
       });
 
-      // Direct/group: fan out to other connected members.
+      // Direct/group: fan out to other connected members, push to offline ones.
       if (conv.type !== ConversationType.bot) {
         const memberIds = await this.conversations.getMembers(dto.conversationId);
+        const senderName = await this.lookupNickname(userId);
         for (const memberId of memberIds) {
+          if (memberId === userId) continue;
           const sockets = this.userSockets.get(memberId);
-          if (!sockets) continue;
-          for (const sid of sockets) {
-            if (sid === client.id) continue;
-            this.server.to(sid).emit('message:new', { message });
+          if (sockets && sockets.size > 0) {
+            for (const sid of sockets) {
+              if (sid === client.id) continue;
+              this.server.to(sid).emit('message:new', { message });
+            }
+          } else {
+            // Offline → push notification. Fire-and-forget so we don't block the ack.
+            void this.push.sendToUser(memberId, {
+              title: senderName,
+              body: this.previewFor(type, dto.text),
+              data: {
+                type: 'message',
+                conversationId: dto.conversationId,
+                messageId: message.id,
+              },
+            });
           }
         }
         return { ok: true };
@@ -237,6 +253,23 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       clientMsgId: replyClientMsgId,
       message: persisted,
     });
+  }
+
+  private async lookupNickname(userId: string): Promise<string> {
+    const u = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { nickname: true },
+    });
+    return u?.nickname ?? '新消息';
+  }
+
+  private previewFor(type: string, text?: string): string {
+    if (type === 'text') return (text ?? '').slice(0, 80);
+    if (type === 'image') return '[图片]';
+    if (type === 'voice') return '[语音]';
+    if (type === 'video') return '[视频]';
+    if (type === 'file') return '[文件]';
+    return '[新消息]';
   }
 
   @SubscribeMessage('message:sync')

@@ -167,6 +167,35 @@ Android：
 - 中断的购买（kill app 后 store 已扣款但 redemption 没送达）只在用户下次进入「钱包」页时被发现并补单。生产建议把 `iapServiceProvider.start()` 提到 App 启动时立即恢复
 - 退款 / 取消订阅自动反账还没接 Apple/Google 的 server notification webhook（已在后端 README 列了 TODO）
 
+## 阶段 9 已交付（推送通知 FCM）
+
+- `firebase_core` + `firebase_messaging` 依赖
+- `core/push/push_setup.dart`：
+  - `initFirebase()`：main 启动时调用，单次初始化
+  - `register()`：登录后调用，请求通知权限 → 拿 FCM token → 生成或读出稳定 deviceId → POST `/users/me/devices`
+  - 订阅 `onTokenRefresh`（token 轮换时自动重新注册）
+  - 暴露 `onMessageOpened` / `onForegroundMessage` 钩子供路由层做深链
+- `main.dart`：通过 `ref.listen` 监听 auth 状态，**用户登录后自动注册推送**
+- 容错：Firebase 没配置时 `initFirebase()` 抛错被吞掉，App 仍可运行
+
+### 上线前需要做的配置
+
+iOS：
+1. Apple Developer Portal 申请 APNs Authentication Key (.p8)
+2. Firebase Console → 项目设置 → Cloud Messaging → iOS → 上传 .p8 / Team ID / Key ID
+3. Xcode → Capabilities 加 "Push Notifications" + "Background Modes → Remote notifications"
+4. `ios/Runner/Info.plist` 加 `FirebaseAppDelegateProxyEnabled = NO`（如手动管理）+ 拷贝 GoogleService-Info.plist
+
+Android：
+1. Firebase Console → 项目设置 → Android app → 下载 `google-services.json` 到 `android/app/`
+2. `android/build.gradle` 加 classpath、`android/app/build.gradle` 加 apply plugin
+3. Android 13+ 在 `AndroidManifest.xml` 声明 `POST_NOTIFICATIONS` 权限（`firebase_messaging` 已申请）
+
+### 已知短板
+
+- 通知 tap → 深链跳转还没接到 go_router（已留 `onMessageOpened` 钩子，下次提交可补）
+- 国内 Android 用户拿不到 FCM（防火墙）；上线时建议把 `firebase_messaging` 包在 `kIsWeb || Platform.isIOS` 检查里，国内 Android 走小米/华为推送（待办）
+
 ## 后续阶段（见 plan）
 
-P1 待办：真实推送（FCM/APNs）、图片审核接阿里云内容安全 / OpenAI Moderation
+P1 待办：图片审核接阿里云内容安全 / OpenAI Moderation

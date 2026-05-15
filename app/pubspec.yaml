@@ -53,6 +53,10 @@ dependencies:
   # In-App Purchases
   in_app_purchase: ^3.2.0
 
+  # Push notifications (FCM; iOS routed via APNs by Firebase)
+  firebase_core: ^3.8.0
+  firebase_messaging: ^15.1.5
+
   # Utilities
   intl: ^0.19.0
   collection: ^1.18.0

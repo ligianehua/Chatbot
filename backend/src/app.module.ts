@@ -12,6 +12,7 @@ import { LegalController } from './legal.controller';
 import { LlmModule } from './llm/llm.module';
 import { MessagesModule } from './messages/messages.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { PushModule } from './push/push.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { UsersModule } from './users/users.module';
 import { WalletModule } from './wallet/wallet.module';
@@ -25,6 +26,7 @@ import { WalletModule } from './wallet/wallet.module';
     PrismaModule,
     LlmModule,
     WalletModule,
+    PushModule,
     AuthModule,
     UsersModule,
     FriendsModule,

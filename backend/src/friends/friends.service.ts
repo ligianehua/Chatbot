@@ -6,10 +6,14 @@ import {
 } from '@nestjs/common';
 import { FriendshipStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PushService } from '../push/push.service';
 
 @Injectable()
 export class FriendsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly push: PushService,
+  ) {}
 
   async sendRequest(userId: string, friendId: string, remark?: string) {
     if (userId === friendId) {
@@ -49,6 +53,17 @@ export class FriendsService {
 
     await this.prisma.friendship.create({
       data: { userId, friendId, status: FriendshipStatus.pending, remark },
+    });
+
+    // Notify the recipient. Sender's nickname becomes the push title.
+    const sender = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { nickname: true },
+    });
+    void this.push.sendToUser(friendId, {
+      title: '好友请求',
+      body: `${sender?.nickname ?? '有人'} 想加你为好友`,
+      data: { type: 'friend_request', fromUserId: userId },
     });
 
     return { status: FriendshipStatus.pending };

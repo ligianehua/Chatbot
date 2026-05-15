@@ -150,14 +150,54 @@ P1（进行中）：
 - [x] 群聊（GroupsModule，11 项 e2e 通过）
 - [x] Bot 市场 + 订阅 + 钱包分账（16 项 e2e 通过）
 - [x] Apple Sign-In / Google Sign-In（10 项 e2e 通过）
-- [x] Apple IAP / Google Play Billing（12 项 e2e 通过，详见下面阶段 8）
-- [ ] 真实推送（FCM + APNs）
+- [x] Apple IAP / Google Play Billing（12 项 e2e 通过）
+- [x] 推送通知（FCM v1，iOS 路由经 Firebase 自动转 APNs，8 项 e2e 通过，详见下面阶段 9）
 - [ ] 图片审核接阿里云内容安全 / OpenAI Moderation
-- [ ] Apple Sign-In / Google Sign-In
 - [ ] 真实邮件服务接入替换 dev token 直返
 - [ ] FCM / APNs 推送实装
 - [ ] 图片内容审核（阿里云内容安全 / AWS Rekognition）
 - [ ] S3 预签名上传替代本地存储
+
+## 阶段 9 验收（推送通知）
+
+8 项 e2e 通过（`test/e2e-push.mjs`）：
+
+- [x] 好友请求触发推送（标题 = 发起人昵称，body = "{昵称} 想加你为好友"）
+- [x] 离线收件人收到消息推送（带文本预览）
+- [x] 在线收件人不收推送（通过 socket 已送达）
+- [x] 图片消息推送 body 显示「[图片]」
+- [x] 失效 token（FCM 返回 unregistered）自动从 Device 表清空
+- [x] 群聊只对离线成员推送（在线成员通过 socket 收到）
+- [x] `/admin/push/log` 受 JWT 保护，PUSH_MODE!=mock 时返回 403
+
+### 设计要点
+
+- 单一上游：FCM v1。iOS 通过 Firebase 接 APNs，无需自己实现 APNs HTTP/2 客户端
+- 触发点：
+  - `ChatGateway.onMessageSend`：检查 `userSockets` 是否有该用户的活跃 socket；无 → push
+  - `FriendsService.sendRequest`：直接 push（接收方多半不在线）
+- Mock provider：内存记录最近 200 条，`GET /admin/push/log` 暴露给 e2e
+- 自动清理：FCM 返回 `UNREGISTERED` / `NOT_FOUND` / `INVALID_ARGUMENT` → 把 Device 行的 pushToken 置 null
+
+### 生产配置
+
+```bash
+# .env (production)
+PUSH_MODE=                     # 不填，走真实 FCM
+FCM_PROJECT_ID=<your firebase project id>
+FCM_SERVICE_KEY_B64=<base64 of firebase-adminsdk-*.json>
+```
+
+Firebase Console：
+1. 创建项目（如未有），iOS / Android app 各配一份（bundle id / package name）
+2. iOS：上传 APNs Authentication Key（.p8 + Team ID + Key ID），Firebase 自动用它向 Apple 发推送
+3. Android：下载 google-services.json
+4. 后端：在「项目设置 → 服务账户」生成 firebase-adminsdk-*.json，base64 后填 `FCM_SERVICE_KEY_B64`
+
+下一步（已留 TODO）：
+- 群聊推送的「@提及」高优先级标记
+- 用户级 push opt-out（通知设置开关）
+- 国内 Android 接小米 / 华为 / OPPO / vivo 厂商通道（FCM 在国内可达性差）
 
 ## 阶段 8 验收（IAP 充值 + 钱包闭环）
 
