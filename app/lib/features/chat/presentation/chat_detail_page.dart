@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/config/api_config.dart';
@@ -11,10 +12,18 @@ import '../data/chat_models.dart';
 import 'chat_provider.dart';
 
 class ChatDetailPage extends ConsumerStatefulWidget {
-  const ChatDetailPage({super.key, required this.conversationId, this.title});
+  const ChatDetailPage({
+    super.key,
+    required this.conversationId,
+    this.title,
+    this.type,
+    this.peerId,
+  });
 
   final String conversationId;
   final String? title;
+  final String? type; // direct | group | bot
+  final String? peerId;
 
   @override
   ConsumerState<ChatDetailPage> createState() => _ChatDetailPageState();
@@ -82,7 +91,17 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
   Widget build(BuildContext context) {
     final state = ref.watch(chatRoomProvider(widget.conversationId));
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title ?? '聊天')),
+      appBar: AppBar(
+        title: Text(widget.title ?? '聊天'),
+        actions: [
+          if (widget.type == 'group' && widget.peerId != null)
+            IconButton(
+              icon: const Icon(Icons.info_outline),
+              tooltip: '群聊信息',
+              onPressed: () => context.push('/groups/${widget.peerId}'),
+            ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [

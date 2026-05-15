@@ -95,6 +95,15 @@ flutter run
 - `delete_account_page.dart`：复选框 + 二次确认弹窗 + 调 `DELETE /users/me` + 自动登出
 - 路由：登录页底部公开链接到 `/legal/*`（App Store 审核需要不登录就能访问）
 
+## 阶段 5 已交付（P1 群聊）
+
+- `features/groups/data/`：群信息 + 成员模型 + API
+- `features/groups/presentation/group_create_page.dart`：从好友列表多选 → 创建群（创建后直接跳进群聊天）
+- `features/groups/presentation/group_info_page.dart`：群信息（成员列表+角色标签）、退群（普通成员）、解散（群主）
+- 通讯录页顶部加「新建群聊」入口
+- 聊天页 AppBar 在群聊时显示信息图标，跳转 `/groups/:id`
+- 会话列表 ChatsPage 把 type/peerId 透传到聊天页，群信息按钮才能工作
+
 ## 后续阶段（见 plan）
 
-P1：群聊、Bot 市场、月订阅付费、Apple/Google Sign-In、真实推送
+P1 待办：Bot 市场、月订阅付费、Apple/Google Sign-In、真实推送

@@ -5,6 +5,7 @@ import { BotsModule } from './bots/bots.module';
 import { ChatModule } from './chat/chat.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { FriendsModule } from './friends/friends.module';
+import { GroupsModule } from './groups/groups.module';
 import { HealthController } from './health.controller';
 import { LegalController } from './legal.controller';
 import { LlmModule } from './llm/llm.module';
@@ -24,6 +25,7 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     UsersModule,
     FriendsModule,
+    GroupsModule,
     ConversationsModule,
     MessagesModule,
     BotsModule,

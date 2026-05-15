@@ -90,7 +90,13 @@ class _ConversationTile extends StatelessWidget {
           : null,
       onTap: () {
         final peerName = c.peer?.nickname ?? c.title;
-        context.push('/chat/${c.id}?title=${Uri.encodeComponent(peerName)}');
+        final qs = <String, String>{
+          'title': peerName,
+          'type': c.type,
+          if (c.peer?.id != null) 'peerId': c.peer!.id,
+        };
+        final q = qs.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
+        context.push('/chat/${c.id}?$q');
       },
     );
   }

@@ -49,6 +49,11 @@ class ContactsPage extends ConsumerWidget {
               loading: () => const SizedBox.shrink(),
               error: (_, __) => const SizedBox.shrink(),
             ),
+            ListTile(
+              leading: const Icon(Icons.group_add_outlined),
+              title: const Text('新建群聊'),
+              onTap: () => context.push('/groups/new'),
+            ),
             const Divider(height: 1),
             friends.when(
               data: (list) {

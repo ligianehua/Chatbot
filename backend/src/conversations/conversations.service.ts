@@ -60,11 +60,13 @@ export class ConversationsService {
     if (memberships.length === 0) return [];
 
     const conversationIds = memberships.map((m) => m.conversationId);
-    // Pull peer info for direct conversations.
-    const allMembers = await this.prisma.conversationMember.findMany({
+
+    // For direct: peer is the other user.
+    const directOtherMembers = await this.prisma.conversationMember.findMany({
       where: {
         conversationId: { in: conversationIds },
         userId: { not: userId },
+        conversation: { type: ConversationType.direct },
       },
       include: {
         user: {
@@ -72,10 +74,33 @@ export class ConversationsService {
         },
       },
     });
-    const peersByConv = new Map<string, { id: string; nickname: string; avatarUrl: string | null }>();
-    for (const m of allMembers) {
-      peersByConv.set(m.conversationId, m.user);
-    }
+    const directPeerByConv = new Map(
+      directOtherMembers.map((m) => [m.conversationId, m.user]),
+    );
+
+    // For group: peer is the Group itself.
+    const groupIds = memberships
+      .filter((m) => m.conversation.type === ConversationType.group && m.conversation.peerId)
+      .map((m) => m.conversation.peerId!);
+    const groups = groupIds.length
+      ? await this.prisma.group.findMany({
+          where: { id: { in: groupIds } },
+          select: { id: true, name: true, avatarUrl: true, memberCount: true },
+        })
+      : [];
+    const groupById = new Map(groups.map((g) => [g.id, g]));
+
+    // For bot: peer is the Bot.
+    const botIds = memberships
+      .filter((m) => m.conversation.type === ConversationType.bot && m.conversation.peerId)
+      .map((m) => m.conversation.peerId!);
+    const bots = botIds.length
+      ? await this.prisma.bot.findMany({
+          where: { id: { in: botIds } },
+          select: { id: true, name: true, avatarUrl: true },
+        })
+      : [];
+    const botById = new Map(bots.map((b) => [b.id, b]));
 
     const lastMsgIds = memberships
       .map((m) => m.conversation.lastMsgId)
@@ -85,18 +110,30 @@ export class ConversationsService {
       : [];
     const lastMsgById = new Map(lastMsgs.map((m) => [m.id, m]));
 
-    return memberships.map((m) => ({
-      id: m.conversationId,
-      type: m.conversation.type,
-      peer: peersByConv.get(m.conversationId) ?? null,
-      unreadCount: m.unreadCount,
-      muted: m.muted,
-      lastMsgAt: m.conversation.lastMsgAt,
-      lastMessage: m.conversation.lastMsgId
-        ? lastMsgById.get(m.conversation.lastMsgId) ?? null
-        : null,
-      lastReadMsgId: m.lastReadMsgId,
-    }));
+    return memberships.map((m) => {
+      const conv = m.conversation;
+      let peer: { id: string; nickname: string; avatarUrl: string | null } | null = null;
+      if (conv.type === ConversationType.direct) {
+        const u = directPeerByConv.get(conv.id);
+        if (u) peer = { id: u.id, nickname: u.nickname, avatarUrl: u.avatarUrl };
+      } else if (conv.type === ConversationType.group && conv.peerId) {
+        const g = groupById.get(conv.peerId);
+        if (g) peer = { id: g.id, nickname: g.name, avatarUrl: g.avatarUrl };
+      } else if (conv.type === ConversationType.bot && conv.peerId) {
+        const b = botById.get(conv.peerId);
+        if (b) peer = { id: b.id, nickname: b.name, avatarUrl: b.avatarUrl };
+      }
+      return {
+        id: conv.id,
+        type: conv.type,
+        peer,
+        unreadCount: m.unreadCount,
+        muted: m.muted,
+        lastMsgAt: conv.lastMsgAt,
+        lastMessage: conv.lastMsgId ? lastMsgById.get(conv.lastMsgId) ?? null : null,
+        lastReadMsgId: m.lastReadMsgId,
+      };
+    });
   }
 
   async ensureMember(conversationId: string, userId: string) {

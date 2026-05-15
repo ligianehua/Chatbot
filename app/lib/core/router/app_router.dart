@@ -10,6 +10,8 @@ import '../../features/bots/presentation/bot_edit_page.dart';
 import '../../features/bots/presentation/bots_page.dart';
 import '../../features/chat/presentation/chat_detail_page.dart';
 import '../../features/chat/presentation/chats_page.dart';
+import '../../features/groups/presentation/group_create_page.dart';
+import '../../features/groups/presentation/group_info_page.dart';
 import '../../features/contacts/presentation/add_friend_page.dart';
 import '../../features/contacts/presentation/contacts_page.dart';
 import '../../features/contacts/presentation/friend_requests_page.dart';
@@ -40,6 +42,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/contacts/add', builder: (_, __) => const AddFriendPage()),
       GoRoute(path: '/contacts/requests', builder: (_, __) => const FriendRequestsPage()),
       GoRoute(path: '/bots/new', builder: (_, __) => const BotEditPage()),
+      GoRoute(path: '/groups/new', builder: (_, __) => const GroupCreatePage()),
+      GoRoute(
+        path: '/groups/:id',
+        builder: (_, state) => GroupInfoPage(groupId: state.pathParameters['id']!),
+      ),
       GoRoute(path: '/legal/privacy', builder: (_, __) => const LegalPage(kind: 'privacy')),
       GoRoute(path: '/legal/terms', builder: (_, __) => const LegalPage(kind: 'terms')),
       GoRoute(path: '/settings/delete-account', builder: (_, __) => const DeleteAccountPage()),
@@ -48,6 +55,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, state) => ChatDetailPage(
           conversationId: state.pathParameters['id']!,
           title: state.uri.queryParameters['title'],
+          type: state.uri.queryParameters['type'],
+          peerId: state.uri.queryParameters['peerId'],
         ),
       ),
       ShellRoute(

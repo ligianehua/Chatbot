@@ -146,10 +146,25 @@ node test/e2e-release.mjs
 ### 上架阶段路线图
 
 P0（已交付）：图片消息、账号删除入口、公开隐私/用户协议
-P1（待办）：
-- Apple Sign-In（验证 Apple ID token 的 JWKS 流程）
-- Google Sign-In
-- 真实邮件服务接入（SendGrid / 阿里云邮件）替换 dev token 直返
-- FCM/APNs 推送（占位 device 注册已就绪，下一步实现 PushService）
-- 图片内容审核（阿里云内容安全 / AWS Rekognition）
-- S3 预签名上传替代本地存储
+P1（进行中）：
+- [x] 群聊（GroupsModule，11 项 e2e 通过）
+- [ ] Bot 市场（公开发现、订阅、付费机制）
+- [ ] 月订阅付费（Apple IAP + Google Play Billing）
+- [ ] Apple Sign-In / Google Sign-In
+- [ ] 真实邮件服务接入替换 dev token 直返
+- [ ] FCM / APNs 推送实装
+- [ ] 图片内容审核（阿里云内容安全 / AWS Rekognition）
+- [ ] S3 预签名上传替代本地存储
+
+## 阶段 5 验收（P1 群聊）
+
+11 项端到端检查通过（`test/e2e-groups.mjs`）：
+
+- [x] 创建群聊（自动注入 owner + 邀请的好友，同步生成 type=group 的 conversation）
+- [x] 不能邀请非好友（400）
+- [x] 群对话出现在所有成员的 `/conversations` 列表里，title 等于群名
+- [x] 群消息一对多广播（同一 server msg id 到所有成员）
+- [x] 成员退群后 conversation_members 同步删除，不再收到广播
+- [x] 群主不能退群（必须解散）
+- [x] 管理员可重新邀请退群的好友
+- [x] 解散群聊：group + conversation 同时删除，所有成员 conversation 列表清空
