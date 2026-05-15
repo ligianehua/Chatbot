@@ -2,17 +2,38 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/auth/presentation/auth_provider.dart';
+import '../../features/auth/presentation/forgot_password_page.dart';
 import '../../features/auth/presentation/login_page.dart';
+import '../../features/auth/presentation/register_page.dart';
 import '../../features/bots/presentation/bots_page.dart';
 import '../../features/chat/presentation/chats_page.dart';
+import '../../features/contacts/presentation/add_friend_page.dart';
 import '../../features/contacts/presentation/contacts_page.dart';
+import '../../features/contacts/presentation/friend_requests_page.dart';
 import '../../features/settings/presentation/settings_page.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
+  final authStream = ref.watch(authProvider);
+  final isAuthed = authStream.valueOrNull?.isAuthenticated ?? false;
+
   return GoRouter(
     initialLocation: '/chats',
+    refreshListenable: _AuthListenable(ref),
+    redirect: (context, state) {
+      final loc = state.matchedLocation;
+      const authPaths = {'/login', '/register', '/forgot-password'};
+      final atAuth = authPaths.contains(loc);
+      if (!isAuthed && !atAuth) return '/login';
+      if (isAuthed && atAuth) return '/chats';
+      return null;
+    },
     routes: [
       GoRoute(path: '/login', builder: (_, __) => const LoginPage()),
+      GoRoute(path: '/register', builder: (_, __) => const RegisterPage()),
+      GoRoute(path: '/forgot-password', builder: (_, __) => const ForgotPasswordPage()),
+      GoRoute(path: '/contacts/add', builder: (_, __) => const AddFriendPage()),
+      GoRoute(path: '/contacts/requests', builder: (_, __) => const FriendRequestsPage()),
       ShellRoute(
         builder: (context, state, child) => MainShell(child: child),
         routes: [
@@ -25,6 +46,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+class _AuthListenable extends ChangeNotifier {
+  _AuthListenable(this._ref) {
+    _ref.listen(authProvider, (_, __) => notifyListeners());
+  }
+  final Ref _ref;
+}
 
 class MainShell extends StatelessWidget {
   const MainShell({super.key, required this.child});

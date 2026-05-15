@@ -5,30 +5,33 @@ import 'package:go_router/go_router.dart';
 
 import 'auth_provider.dart';
 
-class LoginPage extends ConsumerStatefulWidget {
-  const LoginPage({super.key});
+class RegisterPage extends ConsumerStatefulWidget {
+  const RegisterPage({super.key});
 
   @override
-  ConsumerState<LoginPage> createState() => _LoginPageState();
+  ConsumerState<RegisterPage> createState() => _RegisterPageState();
 }
 
-class _LoginPageState extends ConsumerState<LoginPage> {
+class _RegisterPageState extends ConsumerState<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _nickname = TextEditingController();
 
   @override
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _nickname.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    await ref.read(authProvider.notifier).login(
+    await ref.read(authProvider.notifier).register(
           email: _email.text.trim(),
           password: _password.text,
+          nickname: _nickname.text.trim(),
         );
     if (!mounted) return;
     final state = ref.read(authProvider);
@@ -49,7 +52,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('登录')),
+      appBar: AppBar(title: const Text('注册')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -58,6 +61,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                TextFormField(
+                  controller: _nickname,
+                  decoration: const InputDecoration(labelText: '昵称'),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? '请输入昵称' : null,
+                ),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _email,
                   keyboardType: TextInputType.emailAddress,
@@ -68,8 +77,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 TextFormField(
                   controller: _password,
                   obscureText: true,
-                  decoration: const InputDecoration(labelText: '密码'),
-                  validator: (v) => (v == null || v.length < 8) ? '至少 8 位' : null,
+                  decoration: const InputDecoration(labelText: '密码（至少 8 位，含字母+数字）'),
+                  validator: (v) {
+                    if (v == null || v.length < 8) return '至少 8 位';
+                    if (!RegExp(r'[A-Za-z]').hasMatch(v) || !RegExp(r'\d').hasMatch(v)) {
+                      return '需包含字母和数字';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 24),
                 FilledButton(
@@ -77,16 +92,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   child: auth.isLoading
                       ? const SizedBox(
                           height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('登录'),
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () => context.push('/register'),
-                  child: const Text('还没有账号？去注册'),
-                ),
-                TextButton(
-                  onPressed: () => context.push('/forgot-password'),
-                  child: const Text('忘记密码？'),
+                      : const Text('注册'),
                 ),
               ],
             ),
@@ -100,7 +106,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 String _friendlyError(Object e) {
   if (e is DioException) {
     final code = e.response?.statusCode;
-    if (code == 401) return '邮箱或密码错误';
     if (code == 409) return '邮箱已被注册';
     if (code == 400) {
       final msg = e.response?.data is Map ? (e.response!.data as Map)['message'] : null;

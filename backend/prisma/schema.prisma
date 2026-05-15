@@ -27,6 +27,8 @@ model User {
   updatedAt    DateTime @updatedAt
 
   devices                Device[]
+  sessions               Session[]
+  passwordResetTokens    PasswordResetToken[]
   friendsInitiated       Friendship[]          @relation("FriendshipUser")
   friendsReceived        Friendship[]          @relation("FriendshipFriend")
   conversationMembers    ConversationMember[]
@@ -40,6 +42,34 @@ model User {
   llmUsageLogs           LlmUsageLog[]
 
   @@index([createdAt])
+}
+
+model Session {
+  id               String   @id @default(cuid())
+  userId           String
+  refreshTokenHash String
+  userAgent        String?
+  ip               String?
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([refreshTokenHash])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 enum Gender {
