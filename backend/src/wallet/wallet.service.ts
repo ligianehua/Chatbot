@@ -107,6 +107,58 @@ export class WalletService {
     });
   }
 
+  /**
+   * Credits from a verified external order (IAP/Stripe). Idempotent on
+   * `externalOrderId` — replaying the same receipt returns the prior
+   * transaction without double-crediting. The (transaction.externalOrderId)
+   * column isn't a DB unique constraint today; we enforce uniqueness inside
+   * an interactive transaction with a re-check to close the race.
+   */
+  async creditFromExternalOrder(args: {
+    userId: string;
+    amountCents: number;
+    externalOrderId: string;
+    type?: TransactionType;
+  }) {
+    if (args.amountCents <= 0) throw new BadRequestException('amount must be > 0');
+    if (!args.externalOrderId) throw new BadRequestException('externalOrderId required');
+
+    // Fast path: already credited.
+    const prior = await this.prisma.transaction.findFirst({
+      where: { externalOrderId: args.externalOrderId },
+    });
+    if (prior) {
+      const w = await this.getOrCreate(args.userId);
+      return { wallet: w, transaction: prior, idempotent: true };
+    }
+
+    await this.getOrCreate(args.userId);
+    return this.prisma.$transaction(async (tx) => {
+      const racing = await tx.transaction.findFirst({
+        where: { externalOrderId: args.externalOrderId },
+      });
+      if (racing) {
+        const w = await tx.wallet.findUnique({ where: { userId: args.userId } });
+        return { wallet: w!, transaction: racing, idempotent: true };
+      }
+      const w = await tx.wallet.update({
+        where: { userId: args.userId },
+        data: { balanceCents: { increment: args.amountCents } },
+      });
+      const txn = await tx.transaction.create({
+        data: {
+          userId: args.userId,
+          type: args.type ?? TransactionType.recharge,
+          amountCents: args.amountCents,
+          currency: w.currency,
+          externalOrderId: args.externalOrderId,
+          status: TransactionStatus.succeeded,
+        },
+      });
+      return { wallet: w, transaction: txn, idempotent: false };
+    });
+  }
+
   async listTransactions(userId: string, limit = 50) {
     return this.prisma.transaction.findMany({
       where: { userId },

@@ -137,6 +137,36 @@ Android / iOS（Google Sign-In）：
 - Android `google-services.json` 放对位置
 - 后端 `GOOGLE_CLIENT_IDS` 列出全部 client id
 
+## 阶段 8 已交付（Apple IAP + Google Play Billing）
+
+- `in_app_purchase ^3.2.0` 依赖
+- `features/wallet/data/iap_api.dart`：catalog + redeem
+- `features/wallet/data/iap_service.dart`：包装 `in_app_purchase`，订阅 purchaseStream，自动 POST 后端 `/iap/redeem`，成功后用 Stream 广播余额更新
+- `features/wallet/presentation/wallet_page.dart`：从后端拉 productId → 查 store 拿真实 ProductDetails → 渲染商品卡片（店端本地化价格）；购买完成 → 后端校验 → 自动刷新余额
+- DEV 快捷充值按钮用 `kDebugMode` 包住，**release build 不可见**（Apple/Google 都禁止应用内不走 IAP 收钱）
+
+### 上线前需要做的配置
+
+iOS：
+1. App Store Connect → 创建 4 个 **Consumable** IAP，productId 与后端 catalog 完全一致：
+   - `wallet_topup_100` / `wallet_topup_500` / `wallet_topup_1000` / `wallet_topup_5000`
+2. Xcode → Signing & Capabilities 加 "In-App Purchase"
+3. 准备 Paid Apps 协议 + 银行账户
+
+Android：
+1. Play Console → Monetize → In-app products → 创建 **Managed Products**（productId 同上）
+2. `in_app_purchase` 已经把 billing client 拉进来了
+3. 上传过一次签名 AAB 后才能在 Console 看见商品
+
+后端：
+1. 不填 `IAP_MODE`（走真实 verifier）
+2. 配 `APPLE_IAP_BUNDLE_IDS` / `GOOGLE_PLAY_PACKAGE_NAME` / `GOOGLE_PLAY_SERVICE_KEY_B64`
+
+### 已知短板
+
+- 中断的购买（kill app 后 store 已扣款但 redemption 没送达）只在用户下次进入「钱包」页时被发现并补单。生产建议把 `iapServiceProvider.start()` 提到 App 启动时立即恢复
+- 退款 / 取消订阅自动反账还没接 Apple/Google 的 server notification webhook（已在后端 README 列了 TODO）
+
 ## 后续阶段（见 plan）
 
-P1 待办：Apple IAP / Google Play Billing、真实推送（FCM/APNs）、图片审核
+P1 待办：真实推送（FCM/APNs）、图片审核接阿里云内容安全 / OpenAI Moderation

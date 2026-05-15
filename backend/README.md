@@ -149,13 +149,57 @@ P0（已交付）：图片消息、账号删除入口、公开隐私/用户协�
 P1（进行中）：
 - [x] 群聊（GroupsModule，11 项 e2e 通过）
 - [x] Bot 市场 + 订阅 + 钱包分账（16 项 e2e 通过）
-- [x] Apple Sign-In / Google Sign-In（10 项 e2e 通过，详见下面阶段 7）
-- [ ] Apple IAP / Google Play Billing 替换 dev recharge
+- [x] Apple Sign-In / Google Sign-In（10 项 e2e 通过）
+- [x] Apple IAP / Google Play Billing（12 项 e2e 通过，详见下面阶段 8）
+- [ ] 真实推送（FCM + APNs）
+- [ ] 图片审核接阿里云内容安全 / OpenAI Moderation
 - [ ] Apple Sign-In / Google Sign-In
 - [ ] 真实邮件服务接入替换 dev token 直返
 - [ ] FCM / APNs 推送实装
 - [ ] 图片内容审核（阿里云内容安全 / AWS Rekognition）
 - [ ] S3 预签名上传替代本地存储
+
+## 阶段 8 验收（IAP 充值 + 钱包闭环）
+
+12 项 e2e 通过（`test/e2e-iap.mjs`）：
+
+- [x] `GET /iap/products` 返回 4 档充值商品（$1/$5/$10/$50）
+- [x] Apple receipt 校验 → 钱包入账 + 写 transaction（externalOrderId = `apple:<txnId>`）
+- [x] 同 receipt 重放 → 幂等，余额不变（线程内二次检查防竞态）
+- [x] Apple 不同 txnId 同 productId → 正常入账
+- [x] Google receipt 与 Apple txn 同 id → 入账（provider namespace 隔离）
+- [x] 未知 productId → 400
+- [x] productId 与 receipt 不匹配 → 400
+- [x] 受损 receipt → 400
+- [x] 无 token redeem → 401
+- [x] 交易明细按 provider 命名空间正确归类
+- [x] IAP 充值后用余额订阅付费 Bot 端到端跑通（充 ¥7 → 订 ¥3 → 余 ¥4，创作者收 ¥2.1）
+
+### IAP 接入要点
+
+- 后端有三个 verifier，按 `IAP_MODE` 选：
+  - `IAP_MODE=mock`：接受 `mock:<productId>:<txnId>` 受测试用
+  - Apple：解析 App Store Server API v2 的 JWS `signedTransactionInfo`，校验 x5c 链 + iss/aud + bundleId 在白名单
+  - Google：服务账号 JWT 换 OAuth → 调 `androidpublisher.purchases.products.get` → 检查 `purchaseState=0`
+- 幂等关键：`externalOrderId = ${provider}:${transactionId}`，先快速查 + 事务内二次查防 race
+- **Apple 5.1.1 红线**：充值 / 订阅一切数字内容上 iOS 必须走 IAP。直接 `POST /wallet/recharge` 在 `NODE_ENV=production` 直接拒掉
+- 商品在 App Store Connect / Play Console 配置为 **Consumable**；productId 与 catalog 完全一致
+
+### 生产配置
+
+```bash
+# .env (production)
+NODE_ENV=production
+IAP_MODE=                        # 不填，走真实 verifier
+APPLE_IAP_BUNDLE_IDS=com.example.chatbot
+GOOGLE_PLAY_PACKAGE_NAME=com.example.chatbot
+GOOGLE_PLAY_SERVICE_KEY_B64=<base64 of service account json>
+```
+
+下一步（已留 TODO）：
+- 接 Apple App Store Server Notifications v2（refund、subscription expired）
+- 接 Google Real-time Developer Notifications（refund、voided）
+- 自动反账：收到 refund 通知扣回买家余额
 
 ## 阶段 7 验收（OAuth 登录）
 
