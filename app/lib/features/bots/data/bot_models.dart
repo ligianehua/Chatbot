@@ -8,6 +8,45 @@ BotGender? _parseGender(Object? v) {
   );
 }
 
+enum BotPriceType { free, monthly, oneoff, perMsg }
+
+BotPriceType _parsePrice(Object? v) {
+  switch (v) {
+    case 'free':
+      return BotPriceType.free;
+    case 'monthly':
+      return BotPriceType.monthly;
+    case 'oneoff':
+      return BotPriceType.oneoff;
+    case 'per_msg':
+      return BotPriceType.perMsg;
+    default:
+      return BotPriceType.free;
+  }
+}
+
+String priceTypeWire(BotPriceType t) {
+  switch (t) {
+    case BotPriceType.free:
+      return 'free';
+    case BotPriceType.monthly:
+      return 'monthly';
+    case BotPriceType.oneoff:
+      return 'oneoff';
+    case BotPriceType.perMsg:
+      return 'per_msg';
+  }
+}
+
+class BotCreator {
+  BotCreator({required this.id, required this.nickname, this.avatarUrl});
+  factory BotCreator.fromJson(Map<String, dynamic> j) =>
+      BotCreator(id: j['id'], nickname: j['nickname'], avatarUrl: j['avatarUrl']);
+  final String id;
+  final String nickname;
+  final String? avatarUrl;
+}
+
 class Bot {
   Bot({
     required this.id,
@@ -18,12 +57,16 @@ class Bot {
     required this.temperature,
     required this.isPublic,
     required this.status,
+    required this.priceType,
+    required this.priceCents,
+    required this.currency,
     this.avatarUrl,
     this.gender,
     this.age,
     this.occupation,
     this.bio,
     this.welcomeMsg,
+    this.creator,
   });
 
   factory Bot.fromJson(Map<String, dynamic> json) {
@@ -42,6 +85,12 @@ class Bot {
       welcomeMsg: json['welcomeMsg'] as String?,
       isPublic: json['isPublic'] as bool,
       status: json['status'] as String,
+      priceType: _parsePrice(json['priceType']),
+      priceCents: (json['priceCents'] as num?)?.toInt() ?? 0,
+      currency: json['currency'] as String? ?? 'USD',
+      creator: json['creator'] is Map
+          ? BotCreator.fromJson((json['creator'] as Map).cast<String, dynamic>())
+          : null,
     );
   }
 
@@ -59,6 +108,26 @@ class Bot {
   final String? welcomeMsg;
   final bool isPublic;
   final String status;
+  final BotPriceType priceType;
+  final int priceCents;
+  final String currency;
+  final BotCreator? creator;
+
+  String get priceLabel {
+    if (priceType == BotPriceType.free) return '免费';
+    final amount = (priceCents / 100).toStringAsFixed(2);
+    final sign = currency == 'CNY' ? '¥' : (currency == 'USD' ? '\$' : '');
+    switch (priceType) {
+      case BotPriceType.monthly:
+        return '$sign$amount / 月';
+      case BotPriceType.oneoff:
+        return '$sign$amount (一次性)';
+      case BotPriceType.perMsg:
+        return '$sign$amount / 条';
+      case BotPriceType.free:
+        return '免费';
+    }
+  }
 }
 
 class CreateBotInput {
@@ -73,6 +142,8 @@ class CreateBotInput {
     this.temperature,
     this.welcomeMsg,
     this.isPublic = false,
+    this.priceType = BotPriceType.free,
+    this.priceCents = 0,
   });
 
   final String name;
@@ -85,6 +156,8 @@ class CreateBotInput {
   final double? temperature;
   final String? welcomeMsg;
   final bool isPublic;
+  final BotPriceType priceType;
+  final int priceCents;
 
   Map<String, dynamic> toJson() => {
         'name': name,
@@ -97,5 +170,7 @@ class CreateBotInput {
         if (temperature != null) 'temperature': temperature,
         if (welcomeMsg != null && welcomeMsg!.isNotEmpty) 'welcomeMsg': welcomeMsg,
         'isPublic': isPublic,
+        'priceType': priceTypeWire(priceType),
+        if (priceType != BotPriceType.free) 'priceCents': priceCents,
       };
 }

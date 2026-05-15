@@ -1,4 +1,4 @@
-import { Gender } from '@prisma/client';
+import { BotPriceType, Gender } from '@prisma/client';
 import {
   IsBoolean,
   IsEnum,
@@ -70,4 +70,14 @@ export class UpdateBotDto {
   @IsOptional()
   @IsBoolean()
   isPublic?: boolean;
+
+  @IsOptional()
+  @IsEnum(BotPriceType)
+  priceType?: BotPriceType;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1_000_000)
+  priceCents?: number;
 }

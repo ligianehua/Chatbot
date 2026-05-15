@@ -104,6 +104,18 @@ flutter run
 - 聊天页 AppBar 在群聊时显示信息图标，跳转 `/groups/:id`
 - 会话列表 ChatsPage 把 type/peerId 透传到聊天页，群信息按钮才能工作
 
+## 阶段 6 已交付（P1 Bot 市场 + 订阅 + 钱包）
+
+- `features/bots/data/bot_models.dart`：扩展 `priceType` / `priceCents` / `creator`，含 `priceLabel` 显示
+- `features/bots/data/bots_api.dart`：marketplace / subscribed / subscribe / unsubscribe
+- `features/bots/presentation/bots_page.dart`：重构为三 TabBar 子页（**我的 / 已订阅 / 发现**），「发现」带搜索框
+- `features/bots/presentation/bot_detail_page.dart`：详情页（头像 + 简介 + 创建者 + 价格 + 「订阅」/「开始聊天」按钮），付费有二次确认弹窗；余额不足提示去钱包充值
+- `features/bots/presentation/bot_edit_page.dart`：「分享与价格」开关 + 价格类型下拉（免费 / 月订阅 / 一次性）+ 价格输入
+- `features/wallet/data/wallet_api.dart`：余额 / 交易记录 / DEV 充值
+- `features/wallet/presentation/wallet_page.dart`：余额卡片 + 充值快捷按钮（\$1 / \$5 / \$10 / \$50）+ 交易明细列表
+- 设置页加入「钱包」入口
+- 路由：`/bots/:id`、`/wallet`
+
 ## 后续阶段（见 plan）
 
-P1 待办：Bot 市场、月订阅付费、Apple/Google Sign-In、真实推送
+P1 待办：Apple IAP / Google Play Billing、Apple/Google Sign-In、真实推送、图片审核

@@ -6,6 +6,7 @@ import '../../features/auth/presentation/auth_provider.dart';
 import '../../features/auth/presentation/forgot_password_page.dart';
 import '../../features/auth/presentation/login_page.dart';
 import '../../features/auth/presentation/register_page.dart';
+import '../../features/bots/presentation/bot_detail_page.dart';
 import '../../features/bots/presentation/bot_edit_page.dart';
 import '../../features/bots/presentation/bots_page.dart';
 import '../../features/chat/presentation/chat_detail_page.dart';
@@ -18,6 +19,7 @@ import '../../features/contacts/presentation/friend_requests_page.dart';
 import '../../features/settings/presentation/delete_account_page.dart';
 import '../../features/settings/presentation/legal_page.dart';
 import '../../features/settings/presentation/settings_page.dart';
+import '../../features/wallet/presentation/wallet_page.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authStream = ref.watch(authProvider);
@@ -42,6 +44,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/contacts/add', builder: (_, __) => const AddFriendPage()),
       GoRoute(path: '/contacts/requests', builder: (_, __) => const FriendRequestsPage()),
       GoRoute(path: '/bots/new', builder: (_, __) => const BotEditPage()),
+      GoRoute(
+        path: '/bots/:id',
+        builder: (_, state) => BotDetailPage(botId: state.pathParameters['id']!),
+      ),
+      GoRoute(path: '/wallet', builder: (_, __) => const WalletPage()),
       GoRoute(path: '/groups/new', builder: (_, __) => const GroupCreatePage()),
       GoRoute(
         path: '/groups/:id',

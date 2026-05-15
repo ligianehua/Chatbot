@@ -25,6 +25,11 @@ class SettingsPage extends ConsumerWidget {
                 ),
               const Divider(),
               ListTile(
+                leading: const Icon(Icons.account_balance_wallet_outlined),
+                title: const Text('钱包'),
+                onTap: () => context.push('/wallet'),
+              ),
+              ListTile(
                 leading: const Icon(Icons.notifications_outlined),
                 title: const Text('通知设置'),
                 onTap: () {/* TODO[阶段 4 P1]: push opt-in toggles */},

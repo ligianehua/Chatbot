@@ -15,6 +15,24 @@ class BotsApi {
         .toList();
   }
 
+  Future<List<Bot>> listSubscribed() async {
+    final res = await _dio.get<List<dynamic>>('/bots/subscribed');
+    return (res.data ?? [])
+        .map((e) => Bot.fromJson((e as Map).cast<String, dynamic>()))
+        .toList();
+  }
+
+  Future<List<Bot>> listMarketplace({String? q, int? limit, String? cursor}) async {
+    final res = await _dio.get<List<dynamic>>('/bots/marketplace', queryParameters: {
+      if (q != null && q.isNotEmpty) 'q': q,
+      if (limit != null) 'limit': limit,
+      if (cursor != null) 'cursor': cursor,
+    });
+    return (res.data ?? [])
+        .map((e) => Bot.fromJson((e as Map).cast<String, dynamic>()))
+        .toList();
+  }
+
   Future<Bot> get(String id) async {
     final res = await _dio.get<Map<String, dynamic>>('/bots/$id');
     return Bot.fromJson(res.data!);
@@ -34,6 +52,15 @@ class BotsApi {
     await _dio.delete<void>('/bots/$id');
   }
 
+  Future<Map<String, dynamic>> subscribe(String botId) async {
+    final res = await _dio.post<Map<String, dynamic>>('/bots/$botId/subscribe');
+    return res.data!;
+  }
+
+  Future<void> unsubscribe(String botId) async {
+    await _dio.delete<void>('/bots/$botId/subscribe');
+  }
+
   Future<Map<String, dynamic>> openConversation(String botId) async {
     final res = await _dio.post<Map<String, dynamic>>('/bots/$botId/conversation');
     return res.data!;
@@ -46,4 +73,13 @@ final botsApiProvider = Provider<BotsApi>((ref) {
 
 final myBotsProvider = FutureProvider.autoDispose<List<Bot>>((ref) async {
   return ref.watch(botsApiProvider).listMine();
+});
+
+final subscribedBotsProvider = FutureProvider.autoDispose<List<Bot>>((ref) async {
+  return ref.watch(botsApiProvider).listSubscribed();
+});
+
+final marketplaceProvider =
+    FutureProvider.autoDispose.family<List<Bot>, String>((ref, query) async {
+  return ref.watch(botsApiProvider).listMarketplace(q: query);
 });

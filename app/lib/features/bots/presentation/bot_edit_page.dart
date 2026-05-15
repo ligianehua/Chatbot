@@ -21,8 +21,11 @@ class _BotEditPageState extends ConsumerState<BotEditPage> {
   final _bio = TextEditingController();
   final _systemPrompt = TextEditingController();
   final _welcomeMsg = TextEditingController();
+  final _priceCents = TextEditingController(text: '0');
   BotGender? _gender;
   double _temperature = 0.7;
+  bool _isPublic = false;
+  BotPriceType _priceType = BotPriceType.free;
   bool _submitting = false;
 
   @override
@@ -33,6 +36,7 @@ class _BotEditPageState extends ConsumerState<BotEditPage> {
     _bio.dispose();
     _systemPrompt.dispose();
     _welcomeMsg.dispose();
+    _priceCents.dispose();
     super.dispose();
   }
 
@@ -40,6 +44,16 @@ class _BotEditPageState extends ConsumerState<BotEditPage> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _submitting = true);
     try {
+      final cents = _priceType == BotPriceType.free
+          ? 0
+          : (int.tryParse(_priceCents.text) ?? 0);
+      if (_priceType != BotPriceType.free && cents <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('付费 Bot 需要设置大于 0 的价格（分）')),
+        );
+        setState(() => _submitting = false);
+        return;
+      }
       final created = await ref.read(botsApiProvider).create(CreateBotInput(
             name: _name.text.trim(),
             gender: _gender,
@@ -49,6 +63,9 @@ class _BotEditPageState extends ConsumerState<BotEditPage> {
             systemPrompt: _systemPrompt.text.trim(),
             temperature: _temperature,
             welcomeMsg: _welcomeMsg.text.trim(),
+            isPublic: _isPublic,
+            priceType: _priceType,
+            priceCents: cents,
           ));
       ref.invalidate(myBotsProvider);
       if (!mounted) return;
@@ -149,7 +166,41 @@ class _BotEditPageState extends ConsumerState<BotEditPage> {
                 label: _temperature.toStringAsFixed(1),
                 onChanged: (v) => setState(() => _temperature = v),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
+              const Divider(),
+              const SizedBox(height: 8),
+              const Text('分享与价格', style: TextStyle(fontWeight: FontWeight.bold)),
+              SwitchListTile(
+                value: _isPublic,
+                onChanged: (v) => setState(() => _isPublic = v),
+                title: const Text('公开发布到 Bot 市场'),
+                subtitle: const Text('其他用户可订阅你的 Bot'),
+                contentPadding: EdgeInsets.zero,
+              ),
+              if (_isPublic) ...[
+                DropdownButtonFormField<BotPriceType>(
+                  value: _priceType,
+                  decoration: const InputDecoration(labelText: '价格类型'),
+                  items: const [
+                    DropdownMenuItem(value: BotPriceType.free, child: Text('免费')),
+                    DropdownMenuItem(value: BotPriceType.monthly, child: Text('月订阅')),
+                    DropdownMenuItem(value: BotPriceType.oneoff, child: Text('一次性购买')),
+                  ],
+                  onChanged: (v) => setState(() => _priceType = v ?? BotPriceType.free),
+                ),
+                if (_priceType != BotPriceType.free) ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _priceCents,
+                    decoration: const InputDecoration(
+                      labelText: '价格（分） *',
+                      helperText: '100 分 = \$1.00；平台抽成 30%，你拿 70%',
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                ],
+              ],
+              const SizedBox(height: 24),
               FilledButton(
                 onPressed: _submitting ? null : _submit,
                 child: _submitting

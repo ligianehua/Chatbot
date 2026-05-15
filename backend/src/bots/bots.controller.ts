@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -33,6 +34,24 @@ export class BotsController {
     return this.bots.listMine(user.sub);
   }
 
+  @Get('marketplace')
+  marketplace(
+    @Query('q') q?: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    return this.bots.listMarketplace({
+      q,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      cursor,
+    });
+  }
+
+  @Get('subscribed')
+  subscribed(@CurrentUser() user: JwtPayload) {
+    return this.bots.listSubscribed(user.sub);
+  }
+
   @Get(':id')
   getById(@Param('id') id: string) {
     return this.bots.getById(id);
@@ -47,6 +66,18 @@ export class BotsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async delete(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     await this.bots.delete(user.sub, id);
+  }
+
+  @Post(':id/subscribe')
+  @HttpCode(HttpStatus.OK)
+  subscribe(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.bots.subscribe(user.sub, id);
+  }
+
+  @Delete(':id/subscribe')
+  @HttpCode(HttpStatus.OK)
+  unsubscribe(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.bots.unsubscribe(user.sub, id);
   }
 
   @Post(':id/conversation')

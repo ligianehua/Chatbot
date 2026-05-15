@@ -148,13 +148,44 @@ node test/e2e-release.mjs
 P0（已交付）：图片消息、账号删除入口、公开隐私/用户协议
 P1（进行中）：
 - [x] 群聊（GroupsModule，11 项 e2e 通过）
-- [ ] Bot 市场（公开发现、订阅、付费机制）
-- [ ] 月订阅付费（Apple IAP + Google Play Billing）
+- [x] Bot 市场 + 订阅 + 钱包分账（16 项 e2e 通过，详见下面阶段 6）
+- [ ] Apple IAP / Google Play Billing 替换 dev recharge
 - [ ] Apple Sign-In / Google Sign-In
 - [ ] 真实邮件服务接入替换 dev token 直返
 - [ ] FCM / APNs 推送实装
 - [ ] 图片内容审核（阿里云内容安全 / AWS Rekognition）
 - [ ] S3 预签名上传替代本地存储
+
+## 阶段 6 验收（P1 Bot 市场 + 订阅 + 钱包）
+
+16 项 e2e 通过（`test/e2e-marketplace.mjs`）：
+
+- [x] `GET /bots/marketplace`：只返回 isPublic + listed，支持 q 搜索
+- [x] 未订阅时 `POST /bots/:id/conversation` 返回 403
+- [x] 免费 Bot 订阅：直接 active，不扣钱包
+- [x] 付费 Bot + 余额不足：400 insufficient balance
+- [x] 充值 → 订阅 → 买家钱包扣款 + 创作者收益（70%，30% 平台抽成）
+- [x] 重复订阅幂等（`already_subscribed`，不重复扣款）
+- [x] `GET /bots/subscribed` 列我订阅的 Bot
+- [x] 创建者不能订阅自己的 Bot（400）
+- [x] 订阅成功后 LLM 流式回复正常工作
+- [x] 取消订阅 → 对话访问立即 403
+- [x] 私有 Bot 不接受外部订阅（403）
+
+跑测试：
+```bash
+node test/e2e-marketplace.mjs
+```
+
+WalletModule 接口：
+- `GET /wallet` — 余额
+- `GET /wallet/transactions` — 交易明细
+- `POST /wallet/recharge { amountCents }` — **DEV/MVP only**，生产环境替换为 IAP receipt 校验
+
+订阅与分账：
+- `POST /bots/:id/subscribe`：免费即激活；付费时一次性 debit + 同事务 credit 创作者（70%）
+- 月订阅写入 `expiresAt = now + 30d`；`openConversation` 自动检查过期并标记
+- `DELETE /bots/:id/subscribe`：把订阅置为 expired，下次 chat 直接 403
 
 ## 阶段 5 验收（P1 群聊）
 
