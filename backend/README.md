@@ -148,13 +148,36 @@ node test/e2e-release.mjs
 P0（已交付）：图片消息、账号删除入口、公开隐私/用户协议
 P1（进行中）：
 - [x] 群聊（GroupsModule，11 项 e2e 通过）
-- [x] Bot 市场 + 订阅 + 钱包分账（16 项 e2e 通过，详见下面阶段 6）
+- [x] Bot 市场 + 订阅 + 钱包分账（16 项 e2e 通过）
+- [x] Apple Sign-In / Google Sign-In（10 项 e2e 通过，详见下面阶段 7）
 - [ ] Apple IAP / Google Play Billing 替换 dev recharge
 - [ ] Apple Sign-In / Google Sign-In
 - [ ] 真实邮件服务接入替换 dev token 直返
 - [ ] FCM / APNs 推送实装
 - [ ] 图片内容审核（阿里云内容安全 / AWS Rekognition）
 - [ ] S3 预签名上传替代本地存储
+
+## 阶段 7 验收（OAuth 登录）
+
+10 项 e2e 通过（`test/e2e-oauth.mjs`）：
+
+- [x] Apple 首次登录 → 创建用户（appleUserId 落库）
+- [x] 同一 Apple sub 二次登录 → 复用既有用户（不重复创建）
+- [x] Google 登录创建独立用户
+- [x] OAuth email 命中已有邮箱密码账户 → 自动 link（不创建重复账户）
+- [x] link 后原密码仍可登录
+- [x] 非法 token / 不支持的 provider / 缺 sub → 401/400 正确拒绝
+- [x] Apple "Hide my email" 场景（无 email）也能创建账户，使用客户端传的 nickname
+
+### OAuth 接入要点
+
+- 后端验签走 `jose` 的 `createRemoteJWKSet` + `jwtVerify`，JWKS 自动缓存
+- `OAUTH_MODE=mock`（dev/CI）：接受 `mock.<base64-json>` 不验签的 token，便于自动化测试
+- 生产配置：
+  - `APPLE_AUDIENCES`：你的 iOS bundle id + Sign in with Apple Service ID（逗号分隔）
+  - `GOOGLE_CLIENT_IDS`：iOS / Android / Web 三个 OAuth client id（逗号分隔）
+- 已有邮箱密码账户首次用同邮箱 OAuth 登录会自动 link，避免账户重复
+- 数据库新增 `appleUserId` / `googleUserId` 唯一索引（migration `20260515_add_oauth_ids`）
 
 ## 阶段 6 验收（P1 Bot 市场 + 订阅 + 钱包）
 

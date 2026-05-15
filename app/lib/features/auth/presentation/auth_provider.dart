@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/storage/auth_storage.dart';
 import '../data/auth_api.dart';
 import '../data/auth_models.dart';
+import '../data/oauth_service.dart';
 
 class AuthState {
   const AuthState({this.user, this.loading = false});
@@ -23,6 +24,7 @@ class AuthState {
 class AuthNotifier extends AsyncNotifier<AuthState> {
   late final AuthApi _api = ref.read(authApiProvider);
   late final AuthStorage _storage = ref.read(authStorageProvider);
+  late final OAuthService _oauth = ref.read(oauthServiceProvider);
 
   @override
   Future<AuthState> build() async {
@@ -71,6 +73,54 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     }
   }
 
+  Future<void> signInWithApple() async {
+    state = const AsyncValue.loading();
+    try {
+      final creds = await _oauth.signInWithApple();
+      if (creds == null) {
+        state = AsyncValue.data(AuthState(user: state.valueOrNull?.user));
+        return;
+      }
+      final result = await _api.oauth(
+        provider: 'apple',
+        idToken: creds.idToken,
+        nickname: creds.nickname,
+      );
+      await _storage.save(
+        accessToken: result.tokens.accessToken,
+        refreshToken: result.tokens.refreshToken,
+        userId: result.user.id,
+      );
+      state = AsyncValue.data(AuthState(user: result.user));
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> signInWithGoogle() async {
+    state = const AsyncValue.loading();
+    try {
+      final creds = await _oauth.signInWithGoogle();
+      if (creds == null) {
+        state = AsyncValue.data(AuthState(user: state.valueOrNull?.user));
+        return;
+      }
+      final result = await _api.oauth(
+        provider: 'google',
+        idToken: creds.idToken,
+        nickname: creds.nickname,
+      );
+      await _storage.save(
+        accessToken: result.tokens.accessToken,
+        refreshToken: result.tokens.refreshToken,
+        userId: result.user.id,
+      );
+      state = AsyncValue.data(AuthState(user: result.user));
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
   Future<void> logout() async {
     final refresh = await _storage.readRefresh();
     if (refresh != null) {
@@ -78,6 +128,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
         await _api.logout(refresh);
       } catch (_) {/* ignore — clear local anyway */}
     }
+    await _oauth.signOutGoogle();
     await _storage.clear();
     state = const AsyncValue.data(AuthState());
   }

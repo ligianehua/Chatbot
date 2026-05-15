@@ -1,4 +1,7 @@
+import 'dart:io' show Platform;
+
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -30,6 +33,20 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           email: _email.text.trim(),
           password: _password.text,
         );
+    _afterAuth();
+  }
+
+  Future<void> _signInWithApple() async {
+    await ref.read(authProvider.notifier).signInWithApple();
+    _afterAuth();
+  }
+
+  Future<void> _signInWithGoogle() async {
+    await ref.read(authProvider.notifier).signInWithGoogle();
+    _afterAuth();
+  }
+
+  void _afterAuth() {
     if (!mounted) return;
     final state = ref.read(authProvider);
     state.when(
@@ -44,6 +61,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       },
     );
   }
+
+  bool get _supportsApple => !kIsWeb && (Platform.isIOS || Platform.isMacOS);
 
   @override
   Widget build(BuildContext context) {
@@ -87,6 +106,32 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 TextButton(
                   onPressed: () => context.push('/forgot-password'),
                   child: const Text('忘记密码？'),
+                ),
+                const SizedBox(height: 20),
+                const Row(children: [
+                  Expanded(child: Divider()),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Text('或', style: TextStyle(color: Colors.grey)),
+                  ),
+                  Expanded(child: Divider()),
+                ]),
+                const SizedBox(height: 12),
+                if (_supportsApple) ...[
+                  OutlinedButton.icon(
+                    onPressed: auth.isLoading ? null : _signInWithApple,
+                    icon: const Icon(Icons.apple),
+                    label: const Text('使用 Apple 登录'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                OutlinedButton.icon(
+                  onPressed: auth.isLoading ? null : _signInWithGoogle,
+                  icon: const Icon(Icons.g_mobiledata, size: 28),
+                  label: const Text('使用 Google 登录'),
                 ),
                 const SizedBox(height: 24),
                 Row(

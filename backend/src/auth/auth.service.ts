@@ -10,6 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { OAuthService, OAuthProvider } from './oauth/oauth.service';
 import { JwtPayload } from './strategies/jwt.strategy';
 
 const BCRYPT_ROUNDS = 10;
@@ -37,7 +38,62 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly oauth: OAuthService,
   ) {}
+
+  /**
+   * Sign-in / sign-up via Apple or Google id token. Resolution order:
+   *   1. Match by provider user id (subsequent logins).
+   *   2. Match by verified email (link OAuth identity to the existing user).
+   *   3. Create a new account.
+   *
+   * Newly created OAuth users have passwordHash = null; they can later set
+   * a password through the reset-password flow.
+   */
+  async oauthSignIn(
+    provider: OAuthProvider,
+    idToken: string,
+    nicknameOverride?: string,
+  ): Promise<{ user: PublicUser; tokens: AuthTokens; created: boolean }> {
+    const claims = await this.oauth.verify(provider, idToken);
+    const providerField = provider === 'apple' ? 'appleUserId' : 'googleUserId';
+    const email = claims.email?.toLowerCase().trim() || null;
+
+    let user = await this.prisma.user.findUnique({
+      where: { [providerField]: claims.sub } as any,
+    });
+    let created = false;
+
+    if (!user && email) {
+      const byEmail = await this.prisma.user.findUnique({ where: { email } });
+      if (byEmail) {
+        user = await this.prisma.user.update({
+          where: { id: byEmail.id },
+          data: { [providerField]: claims.sub } as any,
+        });
+      }
+    }
+
+    if (!user) {
+      const nickname =
+        (nicknameOverride && nicknameOverride.trim()) ||
+        claims.name ||
+        (email ? email.split('@')[0] : 'User') ||
+        'User';
+      user = await this.prisma.user.create({
+        data: {
+          email,
+          nickname: nickname.slice(0, 40),
+          avatarUrl: claims.picture ?? undefined,
+          [providerField]: claims.sub,
+        } as any,
+      });
+      created = true;
+    }
+
+    const tokens = await this.issueTokens(user.id, user.email);
+    return { user: this.toPublic(user), tokens, created };
+  }
 
   async register(email: string, password: string, nickname: string): Promise<{ user: PublicUser; tokens: AuthTokens }> {
     const normalized = email.toLowerCase().trim();

@@ -116,6 +116,27 @@ flutter run
 - 设置页加入「钱包」入口
 - 路由：`/bots/:id`、`/wallet`
 
+## 阶段 7 已交付（OAuth 登录）
+
+- `sign_in_with_apple` + `google_sign_in` 依赖
+- `features/auth/data/oauth_service.dart`：封装两个平台 SDK，返回 `(idToken, nickname?)`
+- `auth_api.dart` + `auth_provider.dart`：新增 `oauth()` API 调用和 `signInWithApple()` / `signInWithGoogle()` notifier 方法，登录后存 token 与邮箱密码登录一致
+- 登录页加「使用 Apple 登录」（仅 iOS/macOS 显示）和「使用 Google 登录」按钮
+- 退出登录时同步清理 Google Sign-In 会话
+
+### 上线前需要做的平台配置
+
+iOS（Apple Sign-In）：
+- Xcode → Signing & Capabilities 加 "Sign in with Apple"
+- Apple Developer Portal 启用 Service ID
+- 后端 `APPLE_AUDIENCES` 填 bundle id + Service ID
+
+Android / iOS（Google Sign-In）：
+- Firebase / Google Cloud Console 配 OAuth client（每个平台一套）
+- iOS `Info.plist` 加 `REVERSED_CLIENT_ID` URL scheme
+- Android `google-services.json` 放对位置
+- 后端 `GOOGLE_CLIENT_IDS` 列出全部 client id
+
 ## 后续阶段（见 plan）
 
-P1 待办：Apple IAP / Google Play Billing、Apple/Google Sign-In、真实推送、图片审核
+P1 待办：Apple IAP / Google Play Billing、真实推送（FCM/APNs）、图片审核

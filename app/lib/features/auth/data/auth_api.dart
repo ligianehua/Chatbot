@@ -28,6 +28,24 @@ class AuthApi {
     return AuthResult.fromJson(res.data!);
   }
 
+  /// Exchanges a verified Apple/Google identity token for our own JWT pair.
+  /// The backend verifies the JWT against the provider's JWKS.
+  Future<AuthResult> oauth({
+    required String provider, // 'apple' | 'google'
+    required String idToken,
+    String? nickname,
+  }) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/auth/oauth',
+      data: {
+        'provider': provider,
+        'idToken': idToken,
+        if (nickname != null && nickname.isNotEmpty) 'nickname': nickname,
+      },
+    );
+    return AuthResult.fromJson(res.data!);
+  }
+
   Future<void> logout(String refreshToken) async {
     await _dio.post<void>('/auth/logout', data: {'refreshToken': refreshToken});
   }
