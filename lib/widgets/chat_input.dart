@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../providers/chat_provider.dart';
+import '../providers/contacts_provider.dart';
+import '../providers/messages_provider.dart';
 
 class ChatInput extends StatefulWidget {
-  const ChatInput({super.key});
+  const ChatInput({super.key, required this.contactId});
+
+  final String contactId;
 
   @override
   State<ChatInput> createState() => _ChatInputState();
@@ -36,7 +39,11 @@ class _ChatInputState extends State<ChatInput> {
   void _handleSend() {
     final String text = _controller.text;
     if (text.trim().isEmpty) return;
-    context.read<ChatProvider>().sendMessage(text);
+    final ContactsProvider contacts = context.read<ContactsProvider>();
+    final MessagesProvider messages = context.read<MessagesProvider>();
+    final contact = contacts.findById(widget.contactId);
+    if (contact == null) return;
+    messages.sendMessage(contact, text);
     _controller.clear();
     _focusNode.requestFocus();
   }
